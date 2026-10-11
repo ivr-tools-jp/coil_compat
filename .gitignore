@@ -1,0 +1,7 @@
+# 添付文書・カタログの写し（著作権のため公開しない）
+docs/ifu/
+.env
+__pycache__/
+# 生成物（app/build.py で作る）
+_site/
+app/index.html

@@ -1,0 +1,16 @@
+{
+  "name": "コイル適合チェッカー",
+  "short_name": "コイル適合",
+  "description": "マイクロカテーテル・親カテーテルと塞栓用コイルの内径の適合を照らし合わせる参考ツール",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2f5",
+  "theme_color": "#0d6c8c",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
