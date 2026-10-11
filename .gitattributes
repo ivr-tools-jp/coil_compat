@@ -1,0 +1,3 @@
+# 改行は LF に固定（CSV は UTF-8 BOM・LF の決まり）
+* text=auto eol=lf
+*.png binary
