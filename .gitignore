@@ -5,3 +5,5 @@ __pycache__/
 # 生成物（app/build.py で作る）
 _site/
 app/index.html
+# 試作の生成物（design/v*_inject.py で作る）
+design/v*_proto.html

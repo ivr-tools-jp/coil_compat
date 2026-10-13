@@ -1,0 +1,648 @@
+<title>コイル適合チェッカー 新デザイン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 片手で使う1カラム。上に「カテーテル＋コイル」の2つの枠（片方が一覧の基準）、下に○△の一覧と×の一覧。
+   組み合わせの判定は一覧の上に重ねるシートで出し、閉じれば元の位置に戻る。配色は design/color_review.md の案 */
+:root{
+  --bg:#ecf1f3; --surface:#ffffff; --surface-2:#e3ebef; --track:#e3ebef; --fg:#0f1d25; --muted:#50606a;
+  --line:#d0d9de; --line-strong:#7b8891;
+  --accent:#0d6c8c; --accent-fg:#ffffff; --accent-soft:#d4edf7;
+  --ok:#2d6d42; --ok-on:#ffffff; --ok-text:#27673d; --ok-soft:#e0f5e5;
+  --warn:#f9b73f; --warn-on:#43260a; --warn-text:#944e12; --warn-soft:#ffeccd;
+  --ng:#6a767f; --ng-text:#545f68; --ng-soft:#e3e9ed;
+  --flag:#a12f2f; --flag-on:#ffffff;
+  --band:#698595; --mark:#0f1d25;
+  --scrim:rgba(8,20,28,.45); --shadow:0 1px 2px rgba(10,30,40,.06),0 8px 24px rgba(10,30,40,.07);
+  --font-ui:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  --r:16px; --tap:48px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1115; --surface:#131b1f; --surface-2:#1a242a; --track:#0b1115; --fg:#d0d9de; --muted:#93a1a9;
+  --line:#283238; --line-strong:#647179;
+  --accent:#5bb1d1; --accent-fg:#011e28; --accent-soft:#15323d;
+  --ok:#519866; --ok-on:#0b1a0f; --ok-text:#73bf88; --ok-soft:#192b1e;
+  --warn:#f5bd56; --warn-on:#2b1c08; --warn-text:#f2b95a; --warn-soft:#372813;
+  --ng:#76828b; --ng-text:#93a1a9; --ng-soft:#1f2529;
+  --flag:#ed8b88; --flag-on:#131b1f;
+  --band:#5b7686; --mark:#d0d9de;
+  --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1115; --surface:#131b1f; --surface-2:#1a242a; --track:#0b1115; --fg:#d0d9de; --muted:#93a1a9;
+  --line:#283238; --line-strong:#647179;
+  --accent:#5bb1d1; --accent-fg:#011e28; --accent-soft:#15323d;
+  --ok:#519866; --ok-on:#0b1a0f; --ok-text:#73bf88; --ok-soft:#192b1e;
+  --warn:#f5bd56; --warn-on:#2b1c08; --warn-text:#f2b95a; --warn-soft:#372813;
+  --ng:#76828b; --ng-text:#93a1a9; --ng-soft:#1f2529;
+  --flag:#ed8b88; --flag-on:#131b1f;
+  --band:#5b7686; --mark:#d0d9de;
+  --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html.lock{overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.app{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+
+/* ヘッダー（スクロールすると選んだものを1行で出す） */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);margin-inline:-16px;padding:8px 16px;border-bottom:1px solid transparent}
+.bar.scrolled{border-bottom-color:var(--line)}
+.bar-row{display:flex;align-items:center;gap:8px}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:21px;height:21px}
+.brand{display:flex;flex-direction:column;min-width:0;line-height:1.25;flex:1}
+.brand b{font-weight:700;font-size:17px}
+.brand small{font-size:12px;color:var(--muted)}
+.hbtn{min-width:var(--tap);height:var(--tap);border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:700;color:var(--fg);padding:0 10px;flex:none}
+.mini[hidden]{display:none}
+.mini{margin-top:6px;font-size:14px;font-weight:700;display:flex;gap:8px;align-items:baseline;min-width:0}
+.mini span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini .num{flex:none}
+.caution{margin:4px 0 12px;font-size:13px;color:var(--fg);line-height:1.5}
+.caution button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px;font-size:13px;min-height:auto}
+
+/* 2つの枠 */
+.pair{display:grid;grid-template-columns:1fr 26px 1fr;align-items:stretch}
+.slot{position:relative;min-width:0;border-radius:var(--r);background:var(--surface);border:2px dashed var(--line-strong);display:flex;flex-direction:column}
+.slot.on{border:2px solid var(--accent);box-shadow:var(--shadow)}
+.slot-main{flex:1;min-width:0;border:0;background:none;text-align:left;padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px;min-height:112px;border-radius:14px}
+.slot-k{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);min-height:28px;display:flex;align-items:center}
+.slot-v{font-weight:700;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.slot:not(.on) .slot-v{color:var(--accent)}
+.slot-n{margin-top:auto;font-size:16px;font-weight:600}
+.slot-n small{font-size:12px;color:var(--muted);font-weight:500;margin-left:4px;font-family:var(--font-ui)}
+.slot-clear{position:absolute;top:0;right:0;min-width:var(--tap);height:var(--tap);border:0;background:none;padding:0 8px;display:grid;place-items:center}
+.slot-clear span{font-size:12.5px;font-weight:700;color:var(--fg);border:1px solid var(--line-strong);border-radius:999px;padding:3px 10px;background:var(--surface)}
+.stale{align-self:flex-start;font-size:12px;font-weight:700;background:var(--warn-soft);color:var(--warn-text);border-radius:6px;padding:2px 7px;margin-top:4px}
+.plus{display:grid;place-items:center;color:var(--muted);font-weight:700;font-size:22px}
+
+/* はじめに */
+.intro{margin-top:14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:10px}
+.intro b{font-size:16px}
+.intro p{margin:0;font-size:14px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:var(--tap);border-radius:12px;padding:0 16px;border:1px solid var(--line-strong);background:var(--surface);font-weight:700;font-size:15px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+
+/* 一覧 */
+.ctx{margin:22px 2px 0;font-size:18px;font-weight:700;line-height:1.4;text-wrap:balance}
+.ctx small{display:block;font-weight:400;font-size:14px;color:var(--fg);margin-top:2px}
+.tally{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:10px 2px 0;font-size:15px;font-weight:700}
+.tally span{display:inline-flex;align-items:center;gap:6px}
+.tally .num{font-size:16px}
+.tally button{border:0;background:none;padding:0 4px;min-height:var(--tap);color:var(--accent);text-decoration:underline;text-underline-offset:3px;font-weight:700;font-size:14px}
+.group{margin-top:18px}
+.gh{display:flex;align-items:baseline;gap:8px;margin:0 4px 6px;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.gh .gc{margin-left:auto;font-family:var(--font-num);letter-spacing:0}
+.list{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.row{width:100%;border:0;background:none;text-align:left;display:flex;gap:12px;align-items:flex-start;padding:14px 12px 14px 14px;border-top:1px solid var(--line);min-height:56px}
+.row:first-child{border-top:0}
+.row:active{background:var(--surface-2)}
+.mk{flex:none;display:block}
+.rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.rtop{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.rname{font-weight:700;font-size:16px;line-height:1.35;min-width:0;flex:1 1 10em;overflow-wrap:anywhere}
+.rreq{flex:none;margin-left:auto;font-size:15px;font-weight:600;color:var(--fg);white-space:nowrap}
+.ia{display:inline-block;min-width:7ch;text-align:left}
+.rsub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.why{font-size:15px;line-height:1.5;color:var(--fg)}
+.why.warn{color:var(--warn-text)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:13px;border-radius:6px;padding:2px 8px;font-weight:700;white-space:nowrap}
+.tag.time{background:var(--warn-soft);color:var(--warn-text)}
+.tag.mfr{background:var(--accent-soft);color:var(--accent)}
+.tag.unv{background:var(--flag);color:var(--flag-on)}
+.chev{flex:none;align-self:center;color:var(--muted);font-size:22px;line-height:1}
+/* × は隠さず、最後に小さく並べる */
+.ngsec{margin-top:26px}
+.list.compact .row{padding:10px 12px;gap:10px;min-height:var(--tap)}
+.list.compact .rname{font-size:15px}
+.list.compact .rreq{font-size:14px}
+.list.compact .why{font-size:14px;color:var(--ng-text)}
+
+/* 内径ゲージ：帯＝コイルが求める内径、縦線＝カテーテルの内径。上限が書かれていない先は破線 */
+.gauge{display:block;position:relative;margin:4px 0 2px}
+.g-track{display:block;position:relative;height:10px;border-radius:5px;background:var(--track);box-shadow:inset 0 0 0 1px var(--line)}
+.g-band{position:absolute;top:0;bottom:0;border-radius:5px;background:var(--band);min-width:4px}
+.g-band.g-open{border-radius:5px 0 0 5px}
+.g-pin{position:absolute;top:-3px;bottom:-3px;width:4px;margin-left:-2px;border-radius:2px;background:var(--band)}
+.g-unk{position:absolute;top:0;bottom:0;border:2px dashed var(--line-strong);border-left:0;border-radius:0 5px 5px 0}
+.g-none{position:absolute;inset:0;border-radius:5px;background:repeating-linear-gradient(135deg,var(--line-strong) 0 2px,transparent 2px 7px)}
+.g-mark{position:absolute;top:-6px;bottom:-6px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--mark);box-shadow:0 0 0 2px var(--surface)}
+.g-mark.out-r::after,.g-mark.out-l::after{content:"";position:absolute;top:50%;transform:translateY(-50%);border:6px solid transparent}
+.g-mark.out-r::after{left:-14px;border-left-color:var(--mark)}
+.g-mark.out-l::after{left:5px;border-right-color:var(--mark)}
+.gauge.big{margin:38px 0 4px}
+.gauge.big .g-track{height:16px;border-radius:8px}
+.gauge.big .g-mark{top:-10px;bottom:-10px;width:4px;margin-left:-2px}
+.g-val{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);font-size:14px;font-weight:600;white-space:nowrap;color:var(--fg)}
+.g-lab{position:absolute;bottom:calc(100% + 6px);font-size:12.5px;color:var(--fg);white-space:nowrap}
+.g-lab.r{right:0}
+.ticks{display:block;position:relative;height:22px;margin-top:8px;font-size:12.5px;color:var(--fg)}
+.ticks span{position:absolute;top:0;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--fg);margin-top:4px}
+.legend i{display:inline-block;width:16px;height:10px;border-radius:3px;background:var(--band);margin-right:6px;vertical-align:-1px}
+.legend i.m{width:4px;height:14px;background:var(--mark);vertical-align:-3px}
+.legend i.u{background:none;border:2px dashed var(--line-strong)}
+.legend i.n{background:repeating-linear-gradient(135deg,var(--line-strong) 0 2px,transparent 2px 5px)}
+
+.empty{margin-top:28px;text-align:center;font-size:15px;display:flex;flex-direction:column;gap:12px;align-items:center}
+footer{margin-top:32px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:8px}
+footer .lg{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--fg)}
+footer .lg span{display:inline-flex;align-items:center;gap:5px}
+footer button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:13px;align-self:flex-start;min-height:32px}
+
+/* シート（選ぶ・判定・ご利用にあたって） */
+.sheet{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet[hidden]{display:none}
+.scrim{position:absolute;inset:0;background:var(--scrim);animation:fade .18s ease-out}
+.panel{position:relative;background:var(--bg);border-radius:22px 22px 0 0;max-height:92%;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px);animation:up .22s cubic-bezier(.2,.8,.2,1);width:100%;max-width:560px;margin:0 auto;touch-action:pan-y}
+@keyframes up{from{transform:translateY(40%)}to{transform:none}}
+@keyframes fade{from{opacity:0}}
+.sh-top{touch-action:none}
+.grab{width:44px;height:5px;border-radius:3px;background:var(--line-strong);margin:8px auto 2px}
+.sh-head{display:flex;align-items:center;gap:8px;padding:4px 16px 10px}
+.sh-head h2{margin:0;font-size:18px;font-weight:700;flex:1;min-width:0;line-height:1.35}
+.sh-head h2:focus{outline:none}
+.sh-body{overflow-y:auto;padding:0 16px 24px;overscroll-behavior:contain;display:flex;flex-direction:column;gap:14px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px}
+.seg button{min-height:var(--tap);border:0;border-radius:9px;background:none;font-weight:700;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:0 12px;min-height:var(--tap)}
+.search:focus-within{border-color:var(--accent)}
+.search svg{flex:none;width:18px;height:18px;color:var(--muted)}
+.search input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:16px;padding:10px 0}
+.plist{display:flex;flex-direction:column;gap:16px}
+.pg h3{margin:0 4px 6px;font-size:13px;letter-spacing:.06em;color:var(--muted)}
+.pg .list{box-shadow:none;border:1px solid var(--line)}
+.pi{width:100%;border:0;background:none;text-align:left;display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);min-height:58px}
+.pi:first-child{border-top:0}
+.pi.on{background:var(--accent-soft)}
+.pi.wm{grid-template-columns:auto 1fr auto}
+.pi.wm .mk{grid-row:1 / span 2}
+.pi.wm .pm{grid-column:2}
+.pi.wm .pv{grid-column:3}
+.presets button{display:flex;align-items:center;justify-content:center;gap:6px}
+.pi .pn{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.pi .pm{grid-column:1;font-size:13px;color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.pi .pv{grid-column:2;grid-row:1 / span 2;font-size:15px;font-weight:600;text-align:right;white-space:nowrap}
+.none{text-align:center;font-size:15px;padding:18px 0}
+.manual{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.manual label{font-size:14px;font-weight:700}
+.mrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mrow input{width:7.5em;min-height:var(--tap);border:2px solid var(--line);border-radius:12px;background:var(--bg);padding:0 12px;font-family:var(--font-num);font-size:18px}
+.mrow input:focus{border-color:var(--accent);outline:none}
+.mrow span{font-size:14px}
+.mrow .btn{margin-left:auto}
+.conv{font-size:14px;min-height:1.5em;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.conv.err{color:var(--flag);font-weight:700}
+.conv button{border:1px solid var(--accent);background:var(--accent-soft);color:var(--fg);border-radius:10px;padding:0 12px;min-height:40px;font-weight:700;font-size:14px}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.presets button{min-height:56px;border-radius:12px;border:2px solid var(--line);background:var(--surface);font-family:var(--font-num);font-weight:600;font-size:17px}
+.presets button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.terms ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.7}
+
+/* 判定カード */
+.verdict{border-radius:20px;padding:18px 16px 16px;background:var(--surface);box-shadow:var(--shadow);border-top:5px solid var(--line-strong)}
+.verdict.ok{border-top-color:var(--ok)} .verdict.warn{border-top-color:var(--warn)} .verdict.ng{border-top-color:var(--ng)}
+.vhead{display:flex;gap:14px;align-items:center}
+.vword{font-weight:700;font-size:22px;line-height:1.3;color:var(--fg)}
+.vwhy{font-size:15px;margin-top:2px}
+.verdict.warn .vwhy{color:var(--warn-text)}
+.vnote{margin-top:12px;font-size:13.5px;background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.vnums{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.vnums div{background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.vnums .k{font-size:12.5px;font-weight:700;color:var(--muted)}
+.vnums b{font-size:17px;font-weight:600;overflow-wrap:anywhere}
+.vnums small{font-size:13px}
+.verdict .tags{margin-top:12px}
+.vpair{font-size:14px;margin-bottom:8px}
+.spec{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.spec summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;min-height:var(--tap);font-weight:700}
+.spec summary::-webkit-details-marker{display:none}
+.spec summary .k{font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.spec summary::after{content:"＋";margin-left:auto;color:var(--muted)}
+.spec[open] summary::after{content:"－"}
+.spec dl{margin:0;padding:0 14px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.spec dt{color:var(--muted)} .spec dd{margin:0;min-width:0;overflow-wrap:anywhere}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app">
+  <header class="bar" id="bar">
+    <div class="bar-row">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 12c0-3 2-5 4-5s3 2 3 5-1 5-3 5-4-2-4-5zm7 0c0-3 2-5 4-5s3 2 3 5-1 5-3 5"/><path d="M18 12c0-3 1-5 2-5"/></svg></span>
+      <span class="brand"><b>コイル適合チェッカー</b><small>データ <span class="num" id="built"></span>・新デザイン試作</small></span>
+      <button class="hbtn" id="theme" aria-label="表示の明るさを切り替える"></button>
+      <button class="hbtn" data-terms aria-label="ご利用にあたって">説明</button>
+    </div>
+    <div class="mini" id="mini" hidden></div>
+  </header>
+  <p class="caution">内径の数値だけで照らし合わせた参考情報です。使う前に最新の添付文書を確認してください。<button data-terms>ご利用にあたって</button></p>
+
+  <section class="pair" id="pair" aria-label="選んでいるもの"></section>
+  <main id="out"></main>
+
+  <footer>
+    <span class="lg" id="legend"></span>
+    <span>ゲージの帯はコイルが求める内径、縦線はカテーテルの内径。破線は添付文書に上限が書かれていない部分です。単位は inch（″）。</span>
+    <span>これはデザインの試作です。判定のしかたとデータは公開版と同じです。</span>
+    <button data-terms>ご利用にあたって</button>
+  </footer>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="scrim" data-close></div>
+  <div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sh-top" id="sh-top">
+      <div class="grab" aria-hidden="true"></div>
+      <div class="sh-head"><h2 id="sheet-title" tabindex="-1"></h2><button class="btn" data-close>閉じる</button></div>
+    </div>
+    <div class="sh-body" id="sheet-body"></div>
+  </div>
+</div>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const EPS = 1e-6;
+const PARENT_PRESETS = [0.035, 0.038, 0.041, 0.042, 0.047];
+const LIMITS = Object.fromEntries(DATA.limits.map(l => [String(l.platform), l.upper_id_in]));
+const SURF = {hydrogel:"ハイドロゲル", fiber:"ファイバー", bare:"ベア"};
+const SURF_ORDER = ["hydrogel", "fiber", "bare"];
+const WORD = {ok:"範囲内", warn:"要確認", ng:"範囲外"};
+const WORD_LONG = {ok:"添付文書の範囲内", warn:"要確認", ng:"範囲外"};
+const RANK = {ok:0, warn:1, ng:2};
+const SCALE = {micro:[0.010, 0.030], parent:[0.033, 0.050]};
+const TICKS = {micro:[0.010, 0.015, 0.020, 0.025, 0.030], parent:[0.035, 0.040, 0.045, 0.050]};
+const ID_MIN = 0.005, ID_MAX = 0.1;
+const TERMS_VER = "2026-10-13";
+const STALE_MS = 12 * 3600e3;
+/* カタカナ・ひらがなで探せるように（公開版では CSV の列に移す） */
+const ALIAS = {carnelian:"カーネリアン", marvel:"マーベル", carry:"キャリー", leon:"レオン", lantern:"ランタン", excelsior:"エクセルシオール", breakthrough:"ブレイクスルー",
+  azur:"アズール", embold:"エンボールド", interlock:"インターロック", concerto:"コンチェルト", target:"ターゲット", avenir:"アベニール", meganir:"メガニール", pixie:"ピクシー",
+  hydropack:"ハイドロパック", silkysoft:"シルキーソフト", infini:"インフィニ"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const inch = v => v == null ? "—" : `${v.toFixed(4).replace(/0$/, "")}″`;
+/* 一覧の右端で小数点の位置をそろえる（同じ幅の箱に左寄せ） */
+const inchA = v => `<span class="ia">${inch(v)}</span>`;
+const mm = v => v == null ? "" : `${(v * 25.4).toFixed(2)} mm`;
+const kata = s => s.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+const norm = s => kata(String(s ?? "").normalize("NFKC").toLowerCase()).replace(/[\s\-・/()（）ー]/g, "");
+
+function store(k, v){ try{ if(v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); }catch(e){ return null; } }
+
+/* ---------- 判定（公開版と同じ） ---------- */
+function judge(coil, id, kind){
+  const r = judgeCore(coil, id, kind);
+  if(r.s === "warn" && coil.why_extra) r.why = r.why + "（" + coil.why_extra + "）";
+  return r;
+}
+function judgeCore(coil, id, kind){
+  if(coil.delivery_via !== kind)
+    return {s:"ng", why: coil.delivery_via === "parent" ? "親カテーテルで送るコイル" : "マイクロカテーテルで送るコイル"};
+  const lo = coil.id_min_in, hi = coil.id_max_in, rule = coil.id_rule;
+  if(rule === "none") return {s:"warn", why:"添付文書に内径の基準なし"};
+  if(id < lo - EPS) return {s:"ng", why:`内径が下限 ${inch(lo)} 未満`};
+  if(rule === "range") return id <= hi + EPS ? {s:"ok", why:""} : {s:"ng", why:`内径が上限 ${inch(hi)} を超える`};
+  if(rule === "min_nomax") return {s:"ok", why:"上限なしと明記"};
+  if(rule === "single" && Math.abs(id - lo) < EPS) return {s:"ok", why:""};
+  const u = LIMITS[coil.platform];
+  if(u == null) return {s:"warn", why: rule === "single" ? `添付文書の記載は ${inch(lo)} のみ。それより太い（上限未設定）` : "添付文書は下限のみ（系統の上限は未設定）"};
+  return id <= u + EPS ? {s:"ok", why:""} : {s:"warn", why:`系統の上限 ${inch(u)} を超える`};
+}
+function reqText(c){
+  if(c.id_rule === "none") return "記載なし";
+  if(c.id_rule === "range") return `${inch(c.id_min_in)}〜${inch(c.id_max_in)}`;
+  if(c.id_rule === "single") return `${inch(c.id_min_in)}`;
+  return `${inch(c.id_min_in)} 以上`;
+}
+function mfrListed(coil, cat){
+  if(!cat || !coil.mfr_listed_catheters) return false;
+  const toks = [cat.model, cat.model.replace(cat.series, "").trim()].filter(t => t.length >= 4);
+  return toks.some(t => coil.mfr_listed_catheters.includes(t));
+}
+
+/* ---------- 印：○＝円、△＝三角、×＝四角。色がわからなくても外形で見分ける ---------- */
+function mk(s, px = 30, soft = false){
+  const a = `class="mk" width="${px}" height="${px}" viewBox="0 0 30 30" role="img" aria-label="${WORD[s]}"`;
+  if(s === "ok") return `<svg ${a}><circle cx="15" cy="15" r="13" style="fill:var(${soft ? "--ok-soft" : "--ok"});stroke:var(--ok);stroke-width:${soft ? 2.5 : 0}"/><circle cx="15" cy="15" r="6.5" style="fill:none;stroke:var(${soft ? "--ok-text" : "--ok-on"});stroke-width:2.6"/></svg>`;
+  if(s === "warn") return `<svg ${a}><path d="M15 2.5 28.5 26.5H1.5Z" style="fill:var(${soft ? "--warn-soft" : "--warn"});stroke:var(--warn-text);stroke-width:${soft ? 2.5 : 1.5};stroke-linejoin:round"/><path d="M15 11.5 21 22H9Z" style="fill:none;stroke:var(${soft ? "--warn-text" : "--warn-on"});stroke-width:2.2;stroke-linejoin:round"/></svg>`;
+  return `<svg ${a}><rect x="3" y="3" width="24" height="24" rx="5" style="fill:var(--ng-soft);stroke:var(--ng);stroke-width:1.5"/><path d="M10.5 10.5l9 9m0-9-9 9" style="fill:none;stroke:var(--ng-text);stroke-width:2.4;stroke-linecap:round"/></svg>`;
+}
+
+/* ---------- 状態 ---------- */
+const saved = store("cc3") || {};
+const st = {
+  anchor: saved.anchor !== undefined ? saved.anchor : {side:"cat", key:{t:"micro", id:DATA.catheters[0].cat_id}},
+  ack: saved.ack || "", t: saved.t || Date.now(), rec: saved.rec || {cat:[], coil:[]}, theme: saved.theme || ""
+};
+let staleMs = saved.anchor && Date.now() - (saved.t || 0) > STALE_MS ? Date.now() - saved.t : 0;
+const save = () => store("cc3", {anchor:st.anchor, ack:st.ack, t:st.t, rec:st.rec, theme:st.theme});
+const coilById = id => DATA.coils.find(c => c.coil_id === id);
+const catById = id => DATA.catheters.find(c => c.cat_id === id);
+function setAnchor(a){ st.anchor = a; st.t = Date.now(); staleMs = 0; save(); }
+
+function resolveCat(k){
+  if(!k) return null;
+  if(k.t === "micro"){ const o = catById(k.id); return o && {key:k, kind:"micro", idv:o.id_distal_in, name:o.model, sub:`${o.manufacturer} · ${o.od_distal_fr ?? "—"}Fr`, obj:o}; }
+  if(k.t === "manual") return {key:k, kind:"micro", idv:k.v, name:"入力した内径", sub:"マイクロカテーテル（先端内径）", obj:null};
+  if(k.t === "parent") return {key:k, kind:"parent", idv:k.v, name:"親カテーテル", sub:"内径で判定", obj:null};
+  return null;
+}
+function remember(side, key){
+  const k = JSON.stringify(key);
+  st.rec[side] = [k, ...st.rec[side].filter(x => x !== k)].slice(0, 4); save();
+}
+function agoText(ms){ const h = Math.round(ms / 3600e3); return h < 48 ? `${h}時間前` : `${Math.round(h / 24)}日前`; }
+
+/* ---------- 内径ゲージ ---------- */
+function gauge(o, idv, kind, big){
+  const [a, b] = SCALE[kind];
+  const raw = v => (v - a) / (b - a) * 100, pct = v => Math.max(0, Math.min(100, raw(v)));
+  const lo = o.id_min_in, hi = o.id_max_in, rule = o.id_rule, u = LIMITS[o.platform];
+  let h = "";
+  let lg = "";
+  if(rule === "none"){ h = `<span class="g-none"></span>`; lg = "none"; }
+  else if(rule === "range") h = `<span class="g-band" style="left:${pct(lo)}%;width:${Math.max(0, pct(hi) - pct(lo))}%"></span>`;
+  else if(rule === "min_nomax"){ h = `<span class="g-band g-open" style="left:${pct(lo)}%;right:0"></span>`; lg = "open"; }
+  else if(u != null) h = `<span class="g-band" style="left:${pct(lo)}%;width:${Math.max(0, pct(u) - pct(lo))}%"></span>`;
+  else { lg = "unk"; h = `<span class="g-unk" style="left:${pct(lo)}%;right:0"></span><span class="g-pin" style="left:${pct(lo)}%"></span>`; }
+  if(idv != null){
+    const r = raw(idv), side = r < 0 ? " out-l" : r > 100 ? " out-r" : "";
+    h += `<span class="g-mark${side}" style="left:${pct(idv)}%">${big ? `<span class="g-val num">${inch(idv)}</span>` : ""}</span>`;
+  }
+  const ticks = big ? `<span class="ticks num">${TICKS[kind].map(t => { const p = pct(t), tx = p < 4 ? "0" : p > 96 ? "-100%" : "-50%"; return `<span style="left:${p}%;transform:translateX(${tx})">${t.toFixed(3)}</span>`; }).join("")}</span>` : "";
+  return {html:`<span class="gauge${big ? " big" : ""}" aria-hidden="true"><span class="g-track">${h}</span>${ticks}</span>`, lg};
+}
+
+/* ---------- 画面 ---------- */
+function slot(side, label, filled, v, n, extra){
+  return `<div class="slot${filled ? " on" : ""}">
+    <button class="slot-main" data-open="${side}" aria-label="${esc(label)}：${esc(filled ? v + "。変える" : v)}">
+      <span class="slot-k">${label}</span><span class="slot-v">${esc(v)}</span>${n ? `<span class="slot-n num">${n}</span>` : ""}${extra || ""}
+    </button>${filled ? `<button class="slot-clear" data-clear aria-label="${label}を外す"><span>外す</span></button>` : ""}</div>`;
+}
+function renderPair(c, o){
+  const stale = staleMs ? `<span class="stale">前回の選択（${agoText(staleMs)}）</span>` : "";
+  $("#pair").innerHTML =
+    slot("cat", "カテーテル", !!c, c ? c.name : (o ? "一覧から選ぶ・入力" : "タップしてえらぶ"), c ? `${inch(c.idv)}<small>${c.kind === "parent" ? "内径" : "先端"}</small>` : "", c ? stale : "") +
+    `<span class="plus" aria-hidden="true">＋</span>` +
+    slot("coil", "コイル", !!o, o ? o.group : (c ? "一覧から選ぶ" : "タップしてえらぶ"), o ? reqText(o) : "", o ? stale : "");
+}
+function intro(){
+  return st.ack === TERMS_VER ? "" : `<aside class="intro"><b>はじめに</b>
+    <p>カテーテルの内径と、コイルの添付文書が求める内径を照らし合わせるだけの参考ツールです。○は「数値が範囲に入る」という意味で、組み合わせの安全を保証しません。</p>
+    <div class="acts"><button class="btn primary" data-ack>わかりました</button><button class="btn" data-terms>ご利用にあたって</button></div></aside>`;
+}
+function tally(items){
+  const n = {ok:0, warn:0, ng:0}; items.forEach(x => n[x.r.s]++);
+  return `<p class="tally"><span>${mk("ok", 22)}範囲内 <b class="num">${n.ok}</b></span><span>${mk("warn", 22)}要確認 <b class="num">${n.warn}</b></span><span>${mk("ng", 22)}範囲外 <b class="num">${n.ng}</b>${n.ng ? `<button data-jump="ng">いちばん下</button>` : ""}</span></p>`;
+}
+function groups(items, key, order, rowFn){
+  const m = new Map();
+  items.forEach(x => { const k = key(x); if(!m.has(k)) m.set(k, []); m.get(k).push(x); });
+  const gs = [...m.entries()].map(([k, list]) => ({k, list:list.sort((a, b) => RANK[a.r.s] - RANK[b.r.s]), best:Math.min(...list.map(x => RANK[x.r.s]))}));
+  gs.sort(order ? (a, b) => order.indexOf(a.k) - order.indexOf(b.k) : (a, b) => a.best - b.best);
+  return gs.map(g => `<section class="group"><h3 class="gh">${esc(g.k)}<span class="gc">${g.list.length}</span></h3><div class="list">${g.list.map(rowFn).join("")}</div></section>`).join("");
+}
+function ngBlock(dead, rowFn){
+  return dead.length ? `<section class="ngsec" id="ng"><h3 class="gh">${mk("ng", 18)}範囲外<span class="gc">${dead.length}</span></h3><div class="list compact">${dead.map(rowFn).join("")}</div></section>` : "";
+}
+function row(attr, s, name, req, sub, g, why, tags){
+  return `<button class="row" ${attr}>${mk(s)}<span class="rmain">
+    <span class="rtop"><span class="rname">${esc(name)}</span><span class="rreq num">${req}</span></span>
+    ${sub ? `<span class="rsub">${esc(sub)}</span>` : ""}${g || ""}${why ? `<span class="why ${s}">${esc(why)}</span>` : ""}${tags ? `<span class="tags">${tags}</span>` : ""}</span>
+    <span class="chev" aria-hidden="true">›</span></button>`;
+}
+function coilTags(o, cat){
+  return (o.reposition_limit_min ? `<span class="tag time">${o.reposition_limit_min}分以内に離脱</span>` : "") +
+    (mfrListed(o, cat) ? `<span class="tag mfr">メーカー記載あり</span>` : "") + (o.verified ? "" : `<span class="tag unv">未照合</span>`);
+}
+function viewCoils(c){
+  const items = DATA.coils.map(o => ({o, r:judge(o, c.idv, c.kind)}));
+  const live = items.filter(x => x.r.s !== "ng"), dead = items.filter(x => x.r.s === "ng");
+  const sz = o => o.size_condition && o.size_condition !== "全サイズ" ? o.size_condition : "";
+  const attr = o => `data-pair-coil="${esc(o.coil_id)}"`;
+  return intro() + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(c.name)}に通せるコイル<small>${c.kind === "parent" ? "内径" : "先端内径"} <span class="num">${inch(c.idv)}</span> で判定</small></h2>` + tally(items) +
+    (live.length ? groups(live, x => SURF[x.o.surface] || x.o.surface, SURF_ORDER.map(s => SURF[s]),
+      ({o, r}) => row(attr(o), r.s, o.group, reqText(o), sz(o), gauge(o, c.idv, c.kind, false).html, r.why, coilTags(o, c.obj))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
+    ngBlock(dead, ({o, r}) => row(attr(o), "ng", o.group, reqText(o), "", "", r.why, ""));
+}
+function viewCats(o){
+  const kind = o.delivery_via;
+  const items = kind === "parent"
+    ? PARENT_PRESETS.map(v => ({o:{key:{t:"parent", v}, model:`内径 ${inch(v)}`, series:"親カテーテル（内径）", idv:v, sub:mm(v)}, r:judge(o, v, "parent")}))
+    : DATA.catheters.map(c => ({o:{key:{t:"micro", id:c.cat_id}, model:c.model, series:c.series, idv:c.id_distal_in, sub:`${c.manufacturer} · ${c.od_distal_fr ?? "—"}Fr · ${(c.lengths_cm || "").replaceAll(";", "/")}cm`, obj:c}, r:judge(o, c.id_distal_in, "micro")}));
+  const live = items.filter(x => x.r.s !== "ng"), dead = items.filter(x => x.r.s === "ng");
+  const attr = c => `data-pair-cat='${esc(JSON.stringify(c.key))}'`;
+  const tags = c => c.obj && mfrListed(o, c.obj) ? `<span class="tag mfr">メーカー記載あり</span>` : "";
+  return intro() + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(o.group)}を通せる${kind === "parent" ? "親カテーテル" : "マイクロカテーテル"}<small>コイルが求める内径 <span class="num">${reqText(o)}</span>${kind === "parent" ? "（親カテーテルで送るコイル）" : ""}</small></h2>` + tally(items) +
+    (live.length ? groups(live, x => x.o.series, null, ({o:c, r}) => row(attr(c), r.s, c.model, inchA(c.idv), c.sub, gauge(o, c.idv, kind, false).html, r.why, tags(c))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
+    ngBlock(dead, ({o:c, r}) => row(attr(c), "ng", c.model, inchA(c.idv), "", "", r.why, ""));
+}
+function render(){
+  const a = st.anchor;
+  const c = a?.side === "cat" ? resolveCat(a.key) : null, o = a?.side === "coil" ? coilById(a.id) : null;
+  renderPair(c, o);
+  $("#out").innerHTML = c ? viewCoils(c) : o ? viewCats(o)
+    : intro() + `<div class="empty"><span>カテーテルかコイルのどちらかをえらぶと、組み合わせの一覧を出します</span><button class="btn primary" data-open="cat">カテーテルからえらぶ</button><button class="btn" data-open="coil">コイルからえらぶ</button></div>`;
+  $("#mini").innerHTML = c ? `<span>${esc(c.name)}</span><span class="num">${inch(c.idv)}</span>` : o ? `<span>${esc(o.group)}</span><span class="num">${reqText(o)}</span>` : "";
+  $("#legend").innerHTML = ["ok", "warn", "ng"].map(s => `<span>${mk(s, 18)}${{ok:"添付文書の範囲内", warn:"要確認（上限の記載なしなど。理由を表示）", ng:"範囲外"}[s]}</span>`).join("");
+}
+
+/* ---------- 重ねるシート（戻るボタンで閉じる） ---------- */
+let ov = null, pushed = false, opener = null;
+function showOverlay(o){
+  const first = !ov; ov = o;
+  if(first){
+    opener = document.activeElement;
+    try{ history.pushState({cc:1}, ""); pushed = true; }catch(e){ pushed = false; }
+    $("#sheet").hidden = false; document.documentElement.classList.add("lock");
+  }
+  drawOverlay();
+  $("#sheet-title").focus({preventScroll:true});
+}
+function closeOverlay(){ if(!ov) return; if(pushed){ try{ history.back(); return; }catch(e){} } hideOverlay(); }
+function hideOverlay(){
+  ov = null; pushed = false; $("#sheet").hidden = true; document.documentElement.classList.remove("lock"); $("#panel").style.transform = "";
+  if(opener && document.contains(opener)) opener.focus({preventScroll:true});
+}
+addEventListener("popstate", () => { if(ov) hideOverlay(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape" && ov) closeOverlay(); });
+/* 上の取っ手を下へ引くと閉じる */
+(() => {
+  let y0 = null; const top = $("#sh-top"), panel = $("#panel");
+  top.addEventListener("pointerdown", e => { y0 = e.clientY; top.setPointerCapture(e.pointerId); });
+  top.addEventListener("pointermove", e => { if(y0 == null) return; const dy = Math.max(0, e.clientY - y0); panel.style.transform = `translateY(${dy}px)`; });
+  const end = e => { if(y0 == null) return; const dy = e.clientY - y0; y0 = null; if(dy > 90) closeOverlay(); else panel.style.transform = ""; };
+  top.addEventListener("pointerup", end); top.addEventListener("pointercancel", end);
+})();
+
+function drawOverlay(){
+  const b = $("#sheet-body"), t = $("#sheet-title");
+  if(ov.type === "terms"){
+    t.textContent = "ご利用にあたって";
+    b.innerHTML = `<div class="terms"><ol>${TERMS.map(x => `<li>${x}</li>`).join("")}</ol></div><button class="btn primary" data-ack data-close>わかりました</button>`;
+    return;
+  }
+  if(ov.type === "pair"){ t.textContent = "組み合わせの判定"; b.innerHTML = pairHtml(ov.c, ov.o); b.scrollTop = 0; return; }
+  const other = st.anchor && st.anchor.side !== ov.side;
+  if(ov.side === "cat"){
+    t.textContent = other ? `カテーテルをえらぶ（${coilById(st.anchor.id)?.group}と組み合わせ）` : "カテーテルをえらぶ";
+    b.innerHTML = `<div class="seg" role="tablist"><button role="tab" data-seg="micro" aria-selected="${ov.seg === "micro"}">マイクロカテーテル</button><button role="tab" data-seg="parent" aria-selected="${ov.seg === "parent"}">親カテーテル</button></div>` +
+      (ov.seg === "micro"
+        ? searchBox("名前・内径で検索（かーねりあん、1018 など）") + `<div class="plist" id="plist"></div>` + manualBox("一覧にないときは先端内径を入力", "0.021")
+        : `<div class="presets">${PARENT_PRESETS.map(v => `<button data-parent="${v}" aria-pressed="${st.anchor?.side === "cat" && st.anchor.key.t === "parent" && Math.abs(st.anchor.key.v - v) < EPS}">${other ? mk(judge(coilById(st.anchor.id), v, "parent").s, 20) : ""}${inch(v)}</button>`).join("")}</div>` + manualBox("ほかの内径を入力", "0.040"));
+  }else{
+    t.textContent = other ? `コイルをえらぶ（${resolveCat(st.anchor.key)?.name}と組み合わせ）` : "コイルをえらぶ";
+    b.innerHTML = searchBox("名前で検索（あずーる、Target など）") + `<div class="plist" id="plist"></div>`;
+  }
+  const q = $("#q"); if(q) q.oninput = () => { ov.q = q.value; drawList(); };
+  const m = $("#mid"); if(m){ m.oninput = () => manualHint(m.value); $("#mid-go").onclick = () => useManual(m.value); m.onkeydown = e => { if(e.key === "Enter") useManual(m.value); }; }
+  if($("#plist")) drawList();
+}
+function searchBox(ph){
+  return `<label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="${ph}" autocomplete="off" enterkeyhint="search" aria-label="検索"></label>`;
+}
+function manualBox(label, ph){
+  return `<div class="manual"><label for="mid">${label}</label><div class="mrow"><input id="mid" inputmode="decimal" placeholder="${ph}" autocomplete="off"><span>inch</span><button class="btn primary" id="mid-go">この内径で見る</button></div><div class="conv" id="mid-conv" aria-live="polite"></div></div>`;
+}
+function hay(parts, nums){ const s = norm(parts.join(" ")); return s + " " + Object.entries(ALIAS).filter(([en]) => s.includes(en)).map(([, ja]) => norm(ja)).join(" ") + " " + nums.filter(v => v != null).map(v => v.toFixed(4).replace(/0$/, "")).join(" "); }
+const CAT_HAY = Object.fromEntries(DATA.catheters.map(c => [c.cat_id, hay([c.model, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name], [c.id_distal_in])]));
+const COIL_HAY = Object.fromEntries(DATA.coils.map(c => [c.coil_id, hay([c.group, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name, c.size_condition, SURF[c.surface]], [c.id_min_in, c.id_max_in])]));
+function drawList(){
+  const q = norm(ov.q || ""), el = $("#plist"), gs = [];
+  /* 片方を選んであるときは、相手の候補それぞれに○△×を出す（選ぶ前に結果が見える） */
+  const other = st.anchor && st.anchor.side !== ov.side;
+  const ao = other && ov.side === "cat" ? coilById(st.anchor.id) : null;
+  const ac = other && ov.side === "coil" ? resolveCat(st.anchor.key) : null;
+  if(ov.side === "cat"){
+    const on = c => st.anchor?.side === "cat" && st.anchor.key.t === "micro" && st.anchor.key.id === c.cat_id;
+    const item = c => `<button class="pi${on(c) ? " on" : ""}${ao ? " wm" : ""}" data-pick-cat='${esc(JSON.stringify({t:"micro", id:c.cat_id}))}'>
+      ${ao ? mk(judge(ao, c.id_distal_in, "micro").s, 26) : ""}<span class="pn">${esc(c.model)}</span><span class="pv num">${inchA(c.id_distal_in)}</span><span class="pm">${esc(c.manufacturer)} · ${c.od_distal_fr ?? "—"}Fr</span></button>`;
+    if(!q){ const rec = st.rec.cat.map(k => JSON.parse(k)).filter(k => k.t === "micro").map(k => catById(k.id)).filter(Boolean); if(rec.length) gs.push(["最近えらんだもの", rec.map(item)]); }
+    const m = new Map(); DATA.catheters.filter(c => !q || CAT_HAY[c.cat_id].includes(q)).forEach(c => { if(!m.has(c.series)) m.set(c.series, []); m.get(c.series).push(item(c)); });
+    gs.push(...m.entries());
+  }else{
+    const item = c => `<button class="pi${st.anchor?.side === "coil" && st.anchor.id === c.coil_id ? " on" : ""}${ac ? " wm" : ""}" data-pick-coil="${esc(c.coil_id)}">
+      ${ac ? mk(judge(c, ac.idv, ac.kind).s, 26) : ""}<span class="pn">${esc(c.group)}</span><span class="pv num">${reqText(c)}</span><span class="pm">${esc(c.manufacturer)}${c.size_condition && c.size_condition !== "全サイズ" ? " · " + esc(c.size_condition) : ""}</span></button>`;
+    const hits = DATA.coils.filter(c => !q || COIL_HAY[c.coil_id].includes(q));
+    if(!q){ const rec = st.rec.coil.map(k => coilById(JSON.parse(k))).filter(Boolean); if(rec.length) gs.push(["最近えらんだもの", rec.map(item)]); }
+    SURF_ORDER.forEach(s => { const l = hits.filter(c => c.surface === s); if(l.length) gs.push([SURF[s], l.map(item)]); });
+  }
+  el.innerHTML = gs.length ? gs.map(([k, l]) => `<div class="pg"><h3>${esc(k)}</h3><div class="list">${l.join("")}</div></div>`).join("")
+    : `<p class="none">「${esc(ov.q)}」に当たるものがありません</p>`;
+}
+const parseIn = s => { const v = parseFloat(String(s).normalize("NFKC")); return isFinite(v) ? v : null; };
+const okId = v => v != null && v >= ID_MIN && v <= ID_MAX;
+function manualHint(s){
+  const el = $("#mid-conv"), v = parseIn(s); el.className = "conv";
+  if(v == null){ el.innerHTML = ""; return; }
+  if(okId(v)){ el.textContent = `＝ ${mm(v)}`; return; }
+  /* よくある打ち間違い：0.021 を 0.21、mm で入力 */
+  const opts = [];
+  if(v > 0.1 && v < 0.6){ const x = +(v / 10).toFixed(4); if(okId(x)) opts.push(`<button data-mid="${x}">${inch(x)} のまちがい？</button>`); }
+  if(v >= 0.25 && v <= 2.6){ const x = +(v / 25.4).toFixed(4); if(okId(x)) opts.push(`<button data-mid="${x}">${v} mm ＝ ${inch(x)}</button>`); }
+  el.className = "conv err";
+  el.innerHTML = `<span>${ID_MIN.toFixed(3)}〜${ID_MAX.toFixed(3)} の範囲で、inch で入力してください。</span>${opts.join("")}`;
+}
+function useManual(s){
+  const v = parseIn(s);
+  if(!okId(v)){ manualHint(s); return; }
+  pickCat(ov.seg === "parent" ? {t:"parent", v} : {t:"manual", v});
+}
+function pickCat(key){
+  remember("cat", key);
+  if(st.anchor && st.anchor.side === "coil"){ const c = resolveCat(key), o = coilById(st.anchor.id); return openPair(c, o); }
+  setAnchor({side:"cat", key}); closeOverlay(); render(); scrollTo({top:0}); $("#ctx")?.focus({preventScroll:true});
+}
+function pickCoil(id){
+  remember("coil", id);
+  if(st.anchor && st.anchor.side === "cat") return openPair(resolveCat(st.anchor.key), coilById(id));
+  setAnchor({side:"coil", id}); closeOverlay(); render(); scrollTo({top:0}); $("#ctx")?.focus({preventScroll:true});
+}
+function openPair(c, o){
+  if(!c || !o) return;
+  showOverlay({type:"pair", c, o});
+  const r = judge(o, c.idv, c.kind);
+  $("#live").textContent = `${c.name}と${o.group}：${WORD_LONG[r.s]}。${r.why}`;
+}
+function pairHtml(c, o){
+  const r = judge(o, c.idv, c.kind), same = o.delivery_via === c.kind;
+  const why = r.why || (r.s === "ok" ? "コイルの添付文書が示す内径の範囲に入っています" : "");
+  const g = same ? gauge(o, c.idv, c.kind, true) : null;
+  const tags = (o.reposition_limit_min ? `<span class="tag time">カテーテルに入れてから ${o.reposition_limit_min}分以内に離脱</span>` : "") +
+    (mfrListed(o, c.obj) ? `<span class="tag mfr">メーカーの記載にこのカテーテル名あり</span>` : "");
+  const src = x => `<dt>販売名</dt><dd>${esc(x.jp_trade_name) || "—"}</dd><dt>承認番号</dt><dd class="num">${esc(x.approval_no) || "—"}</dd>
+    <dt>出典</dt><dd>${esc({ifu_jp:"国内添付文書", catalog_jp:"国内カタログ", foreign:"海外資料"}[x.source_type] || x.source_type)}</dd><dt>添付文書の版</dt><dd>${esc(x.source_date) || "—"}</dd>${x.note ? `<dt>補足</dt><dd>${esc(x.note)}</dd>` : ""}`;
+  let h = `<article class="verdict ${r.s}">
+    <p class="vpair"><b>${esc(c.name)}</b>（${c.kind === "parent" ? "内径 " : ""}${inch(c.idv)}）＋ <b>${esc(o.group)}</b></p>
+    <div class="vhead">${mk(r.s, 60, true)}<div><div class="vword">${WORD_LONG[r.s]}</div>${why ? `<div class="vwhy">${esc(why)}</div>` : ""}</div></div>
+    ${g ? g.html + `<div class="legend">${{none:`<span><i class="n"></i>添付文書に内径の基準なし</span>`, open:`<span><i></i>コイルが求める内径（上限なしと明記）</span>`, unk:`<span><i></i>添付文書の下限</span><span><i class="u"></i>上限の記載なし</span>`}[g.lg] || `<span><i></i>コイルが求める内径</span>`}<span><i class="m"></i>このカテーテル</span></div>` : ""}
+    <div class="vnums"><div><span class="k">カテーテル内径</span><b class="num">${inch(c.idv)}</b><small class="num">${mm(c.idv)}</small></div>
+      <div><span class="k">コイルが求める内径</span><b class="num">${reqText(o)}</b><small>${o.delivery_via === "parent" ? "親カテーテルで送る" : "マイクロカテーテルで送る"}</small></div></div>
+    ${tags ? `<div class="tags">${tags}</div>` : ""}
+    <p class="vnote">内径の数値だけを照らし合わせた結果です。組み合わせの安全や動作は保証しません。使う前に添付文書を確認してください。</p></article>`;
+  h += `<details class="spec"><summary><span class="k">コイル</span>${esc(o.group)}</summary><dl>
+    <dt>適合内径</dt><dd class="num">${reqText(o)}</dd>${o.size_condition && o.size_condition !== "全サイズ" ? `<dt>対象</dt><dd>${esc(o.size_condition)}</dd>` : ""}
+    <dt>表面</dt><dd>${esc(SURF[o.surface] || o.surface)}</dd><dt>離脱</dt><dd>${esc(o.detach_device) || "—"}</dd>
+    ${o.mfr_listed_catheters ? `<dt>メーカー記載</dt><dd>${esc(o.mfr_listed_catheters)}</dd>` : ""}${src(o)}</dl></details>`;
+  if(c.obj){ const k = c.obj; h += `<details class="spec"><summary><span class="k">カテーテル</span>${esc(k.model)}</summary><dl>
+    <dt>先端/手元内径</dt><dd class="num">${inch(k.id_distal_in)} / ${inch(k.id_proximal_in)}</dd><dt>外径</dt><dd class="num">${k.od_distal_fr ?? "—"} / ${k.od_proximal_fr ?? "—"} Fr</dd>
+    <dt>有効長</dt><dd class="num">${esc((k.lengths_cm || "—").replaceAll(";", " / "))} cm</dd>${k.min_guide_id_in ? `<dt>通せる親</dt><dd class="num">内径 ${inch(k.min_guide_id_in)} 以上</dd>` : ""}${src(k)}</dl></details>`; }
+  return h;
+}
+const TERMS = [
+  "このツールは、国内の添付文書・メーカーのカタログなど公開されている資料から、カテーテルの内径とコイルが求める内径を照らし合わせて表示する参考情報です。医療機器どうしの適合や安全性を保証するものではありません。",
+  "判定に使っているのは内径の数値だけです。カテーテルの柔らかさや屈曲、マーカーの数と位置、親カテーテルとの組み合わせ、離脱装置、ハイドロゲルコイルの留置までの時間などは考えていません。",
+  "○は「添付文書に書かれた内径の範囲に入る」という意味です。メーカーがその組み合わせで動作を確かめたことを意味しません。他社製カテーテルとの併用を推奨しないと書いている添付文書もあります。",
+  "△（要確認）は、添付文書に内径の上限や基準が書かれていないものです。使えるかどうかはわかりません。",
+  "データには誤りや、添付文書の改訂が反映されていない部分がありえます。画面上部の「データ」の日付を確かめ、使用前には必ず最新の添付文書・メーカーの情報を確認してください。",
+  "使うかどうか、どう使うかは、使用する医師が自分の判断と責任で決めてください。作成者は、このツールを使ったことで生じた結果について責任を負いません。",
+  "このツールは個人が作成したもので、各メーカーとは関係ありません。製品名は各社の商標です。"];
+
+/* ---------- 表示の明るさ（自動→ライト→ダーク） ---------- */
+const THEMES = ["", "light", "dark"], THEME_LABEL = {"":"自動", light:"ライト", dark:"ダーク"};
+function applyTheme(){
+  if(st.theme) document.documentElement.dataset.theme = st.theme; else document.documentElement.removeAttribute("data-theme");
+  $("#theme").textContent = THEME_LABEL[st.theme];
+}
+
+/* ---------- 操作 ---------- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button,[data-close]"); if(!t) return;
+  const d = t.dataset;
+  if(d.ack !== undefined){ st.ack = TERMS_VER; save(); if(d.close !== undefined) closeOverlay(); render(); return; }
+  if(d.close !== undefined){ closeOverlay(); return; }
+  if(d.terms !== undefined){ showOverlay({type:"terms"}); return; }
+  if(t.id === "theme"){ st.theme = THEMES[(THEMES.indexOf(st.theme) + 1) % 3]; save(); applyTheme(); return; }
+  if(d.open){ const a = st.anchor; showOverlay({type:"pick", side:d.open, seg: d.open === "cat" && ((a?.side === "cat" && a.key.t === "parent") || (a?.side === "coil" && coilById(a.id)?.delivery_via === "parent")) ? "parent" : "micro", q:""}); return; }
+  if(d.clear !== undefined){ setAnchor(null); render(); return; }
+  if(d.jump){ document.getElementById(d.jump)?.scrollIntoView({behavior:"smooth", block:"start"}); return; }
+  if(d.seg){ ov.seg = d.seg; drawOverlay(); return; }
+  if(d.parent){ pickCat({t:"parent", v:+d.parent}); return; }
+  if(d.mid){ $("#mid").value = d.mid; useManual(d.mid); return; }
+  if(d.pickCat){ pickCat(JSON.parse(d.pickCat)); return; }
+  if(d.pickCoil){ pickCoil(d.pickCoil); return; }
+  if(d.pairCoil){ openPair(resolveCat(st.anchor.key), coilById(d.pairCoil)); return; }
+  if(d.pairCat){ openPair(resolveCat(JSON.parse(d.pairCat)), coilById(st.anchor.id)); return; }
+});
+/* 2つの枠が見えなくなったら、ヘッダーに選んだものを出す */
+try{
+  new IntersectionObserver(([en]) => { const off = !en.isIntersecting && !!st.anchor; $("#mini").hidden = !off; $("#bar").classList.toggle("scrolled", off); }, {rootMargin:"-70px 0px 0px 0px"}).observe($("#pair"));
+}catch(e){}
+$("#built").textContent = DATA.built;
+applyTheme();
+render();
+</script>

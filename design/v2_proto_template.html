@@ -1,0 +1,538 @@
+<title>コイル適合チェッカー 新デザイン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* Layout: 片手で使う1カラム。上に「カテーテル × コイル」の2つの枠、その下に判定。選ぶ操作は下から出るシートで行う */
+:root{
+  --bg:#edf2f4; --surface:#ffffff; --surface-2:#e4ebee; --fg:#0e1b23; --muted:#5a6a75; --line:#d2dbe0;
+  --accent:#0d6c8c; --accent-fg:#ffffff; --accent-soft:#d6e9f0;
+  --ok:#15804a; --ok-soft:#d9efe1; --warn:#ad6208; --warn-soft:#fae9cf; --ng:#6d7a85; --ng-soft:#e3e8ec;
+  --flag:#a3302f; --scrim:rgba(8,20,28,.45);
+  --shadow:0 1px 2px rgba(10,30,40,.06),0 8px 24px rgba(10,30,40,.08);
+  --font-display:"Zen Kaku Gothic New","BIZ UDPGothic","Hiragino Sans",sans-serif;
+  --font-ui:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  --r:16px; --tap:48px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#091015; --surface:#111b22; --surface-2:#17242d; --fg:#e2eaef; --muted:#8e9fab; --line:#22313b;
+  --accent:#5bbad8; --accent-fg:#04212b; --accent-soft:#122f3a;
+  --ok:#4cc27f; --ok-soft:#112c1d; --warn:#eba43d; --warn-soft:#33250f; --ng:#7f8d99; --ng-soft:#1a252d;
+  --flag:#f08b8b; --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#091015; --surface:#111b22; --surface-2:#17242d; --fg:#e2eaef; --muted:#8e9fab; --line:#22313b;
+  --accent:#5bbad8; --accent-fg:#04212b; --accent-soft:#122f3a;
+  --ok:#4cc27f; --ok-soft:#112c1d; --warn:#eba43d; --warn-soft:#33250f; --ng:#7f8d99; --ng-soft:#1a252d;
+  --flag:#f08b8b; --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html.lock{overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.app{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+
+/* ヘッダー */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);margin-inline:-16px;padding:10px 16px 8px;display:flex;align-items:center;gap:10px}
+.logo{width:30px;height:30px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:20px;height:20px}
+.brand{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.brand b{font-family:var(--font-display);font-weight:900;font-size:17px;letter-spacing:.02em}
+.brand small{font-size:11px;color:var(--muted)}
+.bar .sp{flex:1}
+.proto{font-size:10.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 8px;white-space:nowrap}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;font-family:var(--font-display);font-weight:900;font-size:15px;color:var(--muted);flex:none}
+.caution{margin:0 0 12px;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:flex-start}
+.caution::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-top:6px}
+.caution button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px;font-size:12px}
+
+/* 2つの枠 */
+.pair{display:grid;grid-template-columns:1fr 28px 1fr;align-items:stretch}
+.slot{position:relative;min-width:0;border-radius:var(--r);background:var(--surface);border:1.5px dashed var(--line);display:flex}
+.slot.on{border:1.5px solid transparent;box-shadow:var(--shadow)}
+.slot.on.cat{background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 30%,var(--line))) border-box}
+.slot.on.coil{background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(225deg,var(--accent),color-mix(in srgb,var(--accent) 30%,var(--line))) border-box}
+.slot-main{flex:1;min-width:0;border:0;background:none;text-align:left;padding:12px 12px 12px;display:flex;flex-direction:column;gap:3px;min-height:104px;border-radius:var(--r)}
+.slot-k{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted)}
+.slot-v{font-weight:700;font-size:14.5px;line-height:1.3;overflow-wrap:anywhere}
+.slot:not(.on) .slot-v{color:var(--accent)}
+.slot-n{margin-top:auto;font-size:15px;font-weight:600}
+.slot-n small{font-size:11px;color:var(--muted);font-weight:500;margin-left:4px}
+.slot-clear{position:absolute;top:4px;right:4px;width:36px;height:36px;border:0;background:none;border-radius:10px;color:var(--muted);font-size:18px;line-height:1}
+.slot.on .slot-main{padding-right:34px}
+.times{display:grid;place-items:center;color:var(--muted);font-family:var(--font-display);font-weight:900;font-size:18px}
+
+/* はじめに */
+.intro{margin-top:14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px}
+.intro b{font-family:var(--font-display);font-size:15px}
+.intro p{margin:0;font-size:13px;color:var(--muted)}
+.intro .acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:var(--tap);border-radius:12px;padding:0 16px;border:1px solid var(--line);background:var(--surface);font-weight:700}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+
+/* 結果 */
+.ctx{margin:20px 2px 10px;font-family:var(--font-display);font-size:17px;font-weight:700;text-wrap:balance;line-height:1.4}
+.ctx small{display:block;font-family:var(--font-ui);font-weight:400;font-size:12.5px;color:var(--muted);margin-top:2px}
+.filters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.fl{min-height:var(--tap);border-radius:12px;border:1.5px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:13.5px;color:var(--muted);padding:0 6px}
+.fl .sym{font-family:var(--font-display);font-weight:900;font-size:16px}
+.fl .n{font-size:15px}
+.fl.ok[aria-pressed="true"]{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.fl.warn[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.fl.ng[aria-pressed="true"]{background:var(--ng-soft);border-color:var(--ng);color:var(--fg)}
+.fl[aria-pressed="false"]{opacity:.75}
+.hidden-note{margin:10px 2px 0;font-size:12.5px;color:var(--muted)}
+
+.group{margin-top:16px}
+.gh{display:flex;align-items:baseline;gap:8px;margin:0 4px 6px;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+.gh .gc{margin-left:auto;font-family:var(--font-num);letter-spacing:0}
+.list{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.row{width:100%;border:0;background:none;text-align:left;display:flex;gap:12px;align-items:flex-start;padding:13px 12px 13px 14px;border-top:1px solid var(--line);min-height:var(--tap)}
+.row:first-child{border-top:0}
+.row:active{background:var(--surface-2)}
+.dot{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-display);font-weight:900;font-size:16px;line-height:1;margin-top:1px}
+.dot.ok{background:var(--ok);color:var(--surface)} .dot.warn{background:var(--warn);color:var(--surface)} .dot.ng{background:var(--ng-soft);color:var(--ng)}
+.rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.rtop{display:flex;gap:10px;align-items:baseline}
+.rname{font-weight:700;font-size:15px;line-height:1.35;min-width:0;flex:1;overflow-wrap:anywhere}
+.rreq{flex:none;font-size:12.5px;color:var(--muted)}
+.rsub{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.why{font-size:12.5px;line-height:1.5}
+.why.warn{color:var(--warn)} .why.ng{color:var(--muted)}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:11.5px;border-radius:6px;padding:2px 7px;font-weight:700;white-space:nowrap}
+.tag.time{background:var(--warn-soft);color:var(--warn)}
+.tag.mfr{background:var(--accent-soft);color:var(--accent)}
+.tag.unv{background:var(--flag);color:var(--surface)}
+.chev{flex:none;align-self:center;color:var(--muted);font-size:20px;line-height:1}
+
+/* 内径ゲージ：コイルが求める範囲（帯）と、このカテーテルの内径（縦線） */
+.gauge{display:block;position:relative;margin:4px 0 2px}
+.track{display:block;position:relative;height:8px;border-radius:4px;background:var(--surface-2)}
+.band{position:absolute;top:0;bottom:0;border-radius:4px;background:color-mix(in srgb,var(--accent) 38%,transparent);min-width:4px}
+.band.open{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 38%,transparent) 70%,color-mix(in srgb,var(--accent) 15%,transparent));border-radius:4px 0 0 4px}
+.band.fade{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 30%,transparent),transparent);border-radius:4px 0 0 4px}
+.band.unknown{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 22%,transparent) 0 5px,transparent 5px 10px)}
+.pin{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-2px;border-radius:2px;background:var(--accent)}
+.mark{position:absolute;top:-5px;bottom:-5px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--fg);box-shadow:0 0 0 2px var(--surface)}
+.mark.ok{background:var(--ok)} .mark.warn{background:var(--warn)} .mark.ng{background:var(--ng)}
+.gauge.big{margin:18px 0 6px}
+.gauge.big .track{height:14px;border-radius:7px}
+.gauge.big .mark{top:-9px;bottom:-9px;width:4px;margin-left:-2px}
+.mlab{position:absolute;bottom:calc(100% + 4px);transform:translateX(-50%);font-size:12px;font-weight:600;white-space:nowrap;color:var(--fg)}
+.ticks{display:block;position:relative;height:20px;margin-top:6px;font-size:10.5px;color:var(--muted)}
+.ticks span{position:absolute;top:0;white-space:nowrap}
+.ticks span::before{content:"";position:absolute;left:50%;top:-6px;width:1px;height:4px;background:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:8px;border-radius:3px;background:color-mix(in srgb,var(--accent) 38%,transparent);margin-right:5px;vertical-align:middle}
+.legend i.m{width:3px;height:12px;background:var(--fg)}
+
+/* 2つとも選んだとき */
+.verdict{margin-top:16px;border-radius:20px;padding:18px 16px 16px;background:var(--surface);box-shadow:var(--shadow);border-top:6px solid var(--line);animation:pop .22s ease-out}
+.verdict.ok{border-top-color:var(--ok)} .verdict.warn{border-top-color:var(--warn)} .verdict.ng{border-top-color:var(--ng)}
+@keyframes pop{from{transform:translateY(6px);opacity:.6}to{transform:none;opacity:1}}
+.vhead{display:flex;gap:14px;align-items:center}
+.vsym{flex:none;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-display);font-weight:900;font-size:34px;line-height:1}
+.verdict.ok .vsym{background:var(--ok);color:var(--surface)} .verdict.warn .vsym{background:var(--warn);color:var(--surface)} .verdict.ng .vsym{background:var(--ng-soft);color:var(--ng)}
+.vword{font-family:var(--font-display);font-weight:900;font-size:22px;line-height:1.25;text-wrap:balance}
+.verdict.ok .vword{color:var(--ok)} .verdict.warn .vword{color:var(--warn)}
+.vwhy{font-size:13px;color:var(--muted);margin-top:2px}
+.vnums{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.vnums div{background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.vnums .k{font-size:11px;color:var(--muted);font-weight:700}
+.vnums b{font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.vnums small{font-size:11px;color:var(--muted)}
+.verdict .tags{margin-top:12px}
+.spec{margin-top:14px;background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.spec summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px;min-height:var(--tap);font-weight:700}
+.spec summary::-webkit-details-marker{display:none}
+.spec summary .k{font-size:11px;letter-spacing:.1em;color:var(--muted)}
+.spec summary::after{content:"＋";margin-left:auto;color:var(--muted)}
+.spec[open] summary::after{content:"－"}
+.spec dl{margin:0;padding:0 14px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+.spec dt{color:var(--muted)} .spec dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.acts2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+
+.empty{margin-top:28px;text-align:center;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:12px;align-items:center}
+
+footer{margin-top:32px;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+footer button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:11.5px;align-self:flex-start}
+
+/* シート */
+.sheet{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet[hidden]{display:none}
+.scrim{position:absolute;inset:0;background:var(--scrim);animation:fade .18s ease-out}
+.panel{position:relative;background:var(--bg);border-radius:22px 22px 0 0;max-height:88%;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px);animation:up .22s cubic-bezier(.2,.8,.2,1);width:100%;max-width:560px;margin:0 auto}
+@keyframes up{from{transform:translateY(40%)}to{transform:none}}
+@keyframes fade{from{opacity:0}}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:8px auto 2px}
+.sh-head{display:flex;align-items:center;gap:8px;padding:6px 16px 10px}
+.sh-head h2{margin:0;font-family:var(--font-display);font-size:18px;font-weight:900;flex:1}
+.sh-body{overflow-y:auto;padding:0 16px 20px;overscroll-behavior:contain;display:flex;flex-direction:column;gap:12px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px}
+.seg button{min-height:40px;border:0;border-radius:9px;background:none;font-weight:700;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:0 12px;min-height:var(--tap)}
+.search:focus-within{border-color:var(--accent)}
+.search svg{flex:none;width:18px;height:18px;color:var(--muted)}
+.search input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:16px;padding:10px 0}
+.plist{display:flex;flex-direction:column;gap:14px}
+.pg h3{margin:0 4px 6px;font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.pg .list{box-shadow:none;border:1px solid var(--line)}
+.pi{width:100%;border:0;background:none;text-align:left;display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);min-height:56px}
+.pi:first-child{border-top:0}
+.pi.on{background:var(--accent-soft)}
+.pi .pn{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.pi .pm{grid-column:1;font-size:12px;color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.pi .pv{grid-column:2;grid-row:1 / span 2;font-size:13.5px;font-weight:600;text-align:right}
+.none{color:var(--muted);text-align:center;font-size:13.5px;padding:18px 0}
+.manual{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.manual label{font-size:13px;font-weight:700}
+.mrow{display:flex;gap:8px;align-items:center}
+.mrow input{width:7.5em;min-height:var(--tap);border:1.5px solid var(--line);border-radius:12px;background:var(--bg);padding:0 12px;font-family:var(--font-num);font-size:17px}
+.mrow input:focus{border-color:var(--accent);outline:none}
+.mrow span{color:var(--muted);font-size:13px}
+.mrow .btn{margin-left:auto}
+.conv{font-size:12.5px;color:var(--muted);min-height:1.5em}
+.conv.err{color:var(--flag)}
+.conv button{border:0;background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:4px 8px;font-weight:700;font-size:12.5px;margin-left:4px}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.presets button{min-height:56px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-family:var(--font-num);font-weight:600;font-size:16px}
+.presets button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.terms ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.7}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 12c0-3 2-5 4-5s3 2 3 5-1 5-3 5-4-2-4-5zm7 0c0-3 2-5 4-5s3 2 3 5-1 5-3 5"/><path d="M18 12c0-3 1-5 2-5"/></svg></span>
+    <span class="brand"><b>コイル適合</b><small>データ <span class="num" id="built"></span></small></span>
+    <span class="sp"></span>
+    <span class="proto">新デザイン試作</span>
+    <button class="icon-btn" id="info" aria-label="ご利用にあたって">i</button>
+  </header>
+  <p class="caution"><span>内径の数値だけで判定した参考情報です。使う前に最新の添付文書を確認してください。<button data-terms>ご利用にあたって</button></span></p>
+
+  <section class="pair" id="pair" aria-label="組み合わせ"></section>
+  <main id="out"></main>
+
+  <footer>
+    <span>○ 添付文書の範囲内　△ 上限の記載なしなど、判定できない（理由を表示）　× 範囲外</span>
+    <span>ゲージの帯はコイルが求める内径、縦線はカテーテルの内径です。単位は inch（″）。</span>
+    <span>これはデザインの試作です。判定のしかたとデータは公開版と同じです。</span>
+    <button data-terms>ご利用にあたって</button>
+  </footer>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="scrim" data-close></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="sh-head"><h2 id="sheet-title"></h2><button class="icon-btn" data-close aria-label="閉じる">×</button></div>
+    <div class="sh-body" id="sheet-body"></div>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const EPS = 1e-6;
+const PARENT_PRESETS = [0.035, 0.038, 0.041, 0.042, 0.047];
+const LIMITS = Object.fromEntries(DATA.limits.map(l => [String(l.platform), l.upper_id_in]));
+const SURF = {hydrogel:"ハイドロゲル", fiber:"ファイバー", bare:"ベア"};
+const SURF_ORDER = ["hydrogel", "fiber", "bare"];
+const SYM = {ok:"○", warn:"△", ng:"×"};
+const WORD = {ok:"範囲内", warn:"要確認", ng:"範囲外"};
+const WORD_LONG = {ok:"添付文書の範囲内", warn:"判定できません", ng:"範囲外"};
+const RANK = {ok:0, warn:1, ng:2};
+const SCALE = {micro:[0.010, 0.030], parent:[0.033, 0.050]};
+const TICKS = {micro:[0.010, 0.015, 0.020, 0.025, 0.030], parent:[0.035, 0.040, 0.045, 0.050]};
+/* カタカナで探せるように（例：カーネリアン → Carnelian） */
+const ALIAS = {carnelian:"カーネリアン", marvel:"マーベル", carry:"キャリー", leon:"レオン", lantern:"ランタン", excelsior:"エクセルシオール", breakthrough:"ブレイクスルー",
+  azur:"アズール", embold:"エンボールド", interlock:"インターロック", concerto:"コンチェルト", target:"ターゲット", avenir:"アベニール", meganir:"メガニール", pixie:"ピクシー",
+  hydropack:"ハイドロパック", silkysoft:"シルキーソフト", infini:"インフィニ"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const inch = v => v == null ? "—" : `${+v.toFixed(4)}″`;
+const mm = v => v == null ? "" : `${(v * 25.4).toFixed(2)} mm`;
+const norm = s => String(s ?? "").normalize("NFKC").toLowerCase().replace(/[\s\-・/()（）]/g, "");
+
+function store(k, v){ try{ if(v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); }catch(e){ return null; } }
+
+/* ---------- 判定（公開版と同じ） ---------- */
+function judge(coil, id, kind){
+  const r = judgeCore(coil, id, kind);
+  if(r.s === "warn" && coil.why_extra) r.why = r.why + "（" + coil.why_extra + "）";
+  return r;
+}
+function judgeCore(coil, id, kind){
+  if(coil.delivery_via !== kind)
+    return {s:"ng", why: coil.delivery_via === "parent" ? "親カテーテルで送るコイル" : "マイクロカテーテルで送るコイル"};
+  const lo = coil.id_min_in, hi = coil.id_max_in, rule = coil.id_rule;
+  if(rule === "none") return {s:"warn", why:"添付文書に内径の基準なし"};
+  if(id < lo - EPS) return {s:"ng", why:`内径が下限 ${inch(lo)} 未満`};
+  if(rule === "range") return id <= hi + EPS ? {s:"ok", why:""} : {s:"ng", why:`内径が上限 ${inch(hi)} を超える`};
+  if(rule === "min_nomax") return {s:"ok", why:"上限なしと明記"};
+  if(rule === "single" && Math.abs(id - lo) < EPS) return {s:"ok", why:""};
+  const u = LIMITS[coil.platform];
+  if(u == null) return {s:"warn", why: rule === "single" ? `添付文書の記載は ${inch(lo)} のみ。それより太い（上限未設定）` : "添付文書は下限のみ（系統の上限は未設定）"};
+  return id <= u + EPS ? {s:"ok", why:""} : {s:"warn", why:`系統の上限 ${inch(u)} を超える`};
+}
+function reqText(c){
+  if(c.id_rule === "none") return "記載なし";
+  if(c.id_rule === "range") return `${inch(c.id_min_in)}〜${inch(c.id_max_in)}`;
+  if(c.id_rule === "single") return `${inch(c.id_min_in)}`;
+  return `${inch(c.id_min_in)} 以上`;
+}
+function mfrListed(coil, cat){
+  if(!cat || !coil.mfr_listed_catheters) return false;
+  const toks = [cat.model, cat.model.replace(cat.series, "").trim()].filter(t => t.length >= 4);
+  return toks.some(t => coil.mfr_listed_catheters.includes(t));
+}
+
+/* ---------- 状態 ---------- */
+const DEFAULT = {cat:{t:"micro", id:DATA.catheters[0].cat_id}, coil:null, show:{ok:true, warn:true, ng:false}, ack:false, rec:{cat:[], coil:[]}};
+const st = Object.assign(structuredClone(DEFAULT), store("cc2") || {});
+const save = () => store("cc2", st);
+const coilById = id => DATA.coils.find(c => c.coil_id === id);
+const catById = id => DATA.catheters.find(c => c.cat_id === id);
+
+function resolveCat(c){
+  if(!c) return null;
+  if(c.t === "micro"){ const o = catById(c.id); return o && {kind:"micro", idv:o.id_distal_in, name:o.model, sub:`${o.manufacturer} · ${o.od_distal_fr ?? "—"}Fr`, obj:o}; }
+  if(c.t === "manual") return {kind:"micro", idv:c.v, name:"入力した内径", sub:"マイクロカテーテル（先端内径）", obj:null};
+  if(c.t === "parent") return {kind:"parent", idv:c.v, name:"親カテーテル", sub:"内径で判定", obj:null};
+  return null;
+}
+function remember(slot, key){
+  const k = JSON.stringify(key);
+  st.rec[slot] = [k, ...st.rec[slot].filter(x => x !== k)].slice(0, 4);
+}
+
+/* ---------- 内径ゲージ ---------- */
+function gauge(o, idv, kind, s, big){
+  const [a, b] = SCALE[kind];
+  const pct = v => Math.max(0, Math.min(100, (v - a) / (b - a) * 100));
+  const lo = o.id_min_in, hi = o.id_max_in, rule = o.id_rule, u = LIMITS[o.platform];
+  let band = "";
+  if(rule === "none") band = `<span class="band unknown" style="left:0;right:0"></span>`;
+  else if(rule === "range") band = `<span class="band" style="left:${pct(lo)}%;width:${pct(hi) - pct(lo)}%"></span>`;
+  else if(rule === "min_nomax") band = `<span class="band open" style="left:${pct(lo)}%;right:0"></span>`;
+  else {
+    band = u != null ? `<span class="band" style="left:${pct(lo)}%;width:${pct(u) - pct(lo)}%"></span>` : `<span class="band fade" style="left:${pct(lo)}%;right:0"></span>`;
+    if(rule === "single") band += `<span class="pin" style="left:${pct(lo)}%"></span>`;
+  }
+  const mark = idv != null ? `<span class="mark ${s}" style="left:${pct(idv)}%">${big ? `<span class="mlab num">${inch(idv)}</span>` : ""}</span>` : "";
+  const ticks = big ? `<span class="ticks num">${TICKS[kind].map(t => { const p = pct(t); const tx = p < 4 ? "0" : p > 96 ? "-100%" : "-50%"; return `<span style="left:${p}%;transform:translateX(${tx})">${t.toFixed(3).replace(/^0/, "")}</span>`; }).join("")}</span>` : "";
+  return `<span class="gauge${big ? " big" : ""}" aria-hidden="true"><span class="track">${band}${mark}</span>${ticks}</span>`;
+}
+
+/* ---------- 画面 ---------- */
+function slotHtml(which, filled, k, v, n){
+  return `<div class="slot ${which}${filled ? " on" : ""}">
+    <button class="slot-main" data-open="${which}" aria-label="${k}を${filled ? "変える" : "えらぶ"}">
+      <span class="slot-k">${k}</span><span class="slot-v">${v}</span>${n ? `<span class="slot-n num">${n}</span>` : ""}
+    </button>${filled ? `<button class="slot-clear" data-clear="${which}" aria-label="${k}を外す">×</button>` : ""}</div>`;
+}
+function renderPair(c, o){
+  $("#pair").innerHTML =
+    slotHtml("cat", !!c, "カテーテル", c ? esc(c.name) : "タップしてえらぶ", c ? `${inch(c.idv)}<small>${c.kind === "parent" ? "親" : "先端"}</small>` : "") +
+    `<span class="times" aria-hidden="true">×</span>` +
+    slotHtml("coil", !!o, "コイル", o ? esc(o.group) : (c ? "すべて表示中" : "タップしてえらぶ"), o ? reqText(o) : "");
+}
+function intro(){
+  return st.ack ? "" : `<aside class="intro"><b>はじめに</b>
+    <p>カテーテルの内径と、コイルの添付文書が求める内径を照らし合わせるだけの参考ツールです。○は「数値が範囲に入る」という意味で、組み合わせの安全を保証しません。</p>
+    <div class="acts"><button class="btn primary" data-ack>わかりました</button><button class="btn" data-terms>ご利用にあたって</button></div></aside>`;
+}
+function filterBar(items){
+  const n = {ok:0, warn:0, ng:0}; items.forEach(x => n[x.r.s]++);
+  const hidden = ["ok","warn","ng"].filter(k => !st.show[k] && n[k]);
+  return `<div class="filters" role="group" aria-label="表示する判定">${["ok","warn","ng"].map(k =>
+    `<button class="fl ${k}" data-fl="${k}" aria-pressed="${st.show[k]}"><span class="sym">${SYM[k]}</span>${WORD[k]}<span class="n num">${n[k]}</span></button>`).join("")}</div>` +
+    (hidden.length ? `<p class="hidden-note">${hidden.map(k => `${SYM[k]} ${n[k]}件`).join("・")}を隠しています。上のボタンで表示できます。</p>` : "");
+}
+function grouped(items, key, order, rowFn){
+  const m = new Map();
+  items.forEach(x => { const k = key(x.o); if(!m.has(k)) m.set(k, []); m.get(k).push(x); });
+  let gs = [...m.entries()].map(([k, list]) => ({k, list: list.sort((a, b) => RANK[a.r.s] - RANK[b.r.s]), best: Math.min(...list.map(x => RANK[x.r.s]))}));
+  gs.sort(order ? (a, b) => order.indexOf(a.k) - order.indexOf(b.k) : (a, b) => a.best - b.best);
+  return gs.map(g => `<section class="group"><h3 class="gh">${esc(g.k)}<span class="gc">${g.list.length}</span></h3><div class="list">${g.list.map(rowFn).join("")}</div></section>`).join("");
+}
+
+function viewCoils(c){
+  const items = DATA.coils.map(o => ({o, r: judge(o, c.idv, c.kind)}));
+  const shown = items.filter(x => st.show[x.r.s]);
+  let h = intro() + `<h2 class="ctx">${esc(c.name)}に通せるコイル<small>${c.kind === "parent" ? "内径" : "先端内径"} <span class="num">${inch(c.idv)}</span> で判定</small></h2>` + filterBar(items);
+  h += shown.length ? grouped(shown, o => SURF[o.surface] || o.surface, SURF_ORDER.map(s => SURF[s]), ({o, r}) => {
+    const tags = [];
+    if(o.reposition_limit_min) tags.push(`<span class="tag time">${o.reposition_limit_min}分以内に離脱</span>`);
+    if(mfrListed(o, c.obj)) tags.push(`<span class="tag mfr">メーカー記載あり</span>`);
+    if(!o.verified) tags.push(`<span class="tag unv">未照合</span>`);
+    return `<button class="row" data-pick-coil="${esc(o.coil_id)}"><span class="dot ${r.s}" role="img" aria-label="${WORD[r.s]}">${SYM[r.s]}</span><span class="rmain">
+      <span class="rtop"><span class="rname">${esc(o.group)}</span><span class="rreq num">${reqText(o)}</span></span>
+      ${o.size_condition && o.size_condition !== "全サイズ" ? `<span class="rsub">${esc(o.size_condition)}</span>` : ""}
+      ${o.delivery_via === c.kind ? gauge(o, c.idv, c.kind, r.s, false) : ""}
+      ${r.why ? `<span class="why ${r.s}">${esc(r.why)}</span>` : ""}${tags.length ? `<span class="tags">${tags.join("")}</span>` : ""}</span>
+      <span class="chev" aria-hidden="true">›</span></button>`;
+  }) : `<p class="empty">表示する組み合わせがありません</p>`;
+  return h;
+}
+function viewCats(o){
+  const kind = o.delivery_via;
+  const items = kind === "parent"
+    ? PARENT_PRESETS.map(v => ({o:{key:{t:"parent", v}, model:`内径 ${inch(v)}`, series:"親カテーテル（内径）", idv:v, sub:mm(v)}, r: judge(o, v, "parent")}))
+    : DATA.catheters.map(c => ({o:{key:{t:"micro", id:c.cat_id}, model:c.model, series:c.series, idv:c.id_distal_in, sub:`${c.manufacturer} · ${c.od_distal_fr ?? "—"}Fr · ${(c.lengths_cm || "").replaceAll(";", "/")}cm`, obj:c}, r: judge(o, c.id_distal_in, "micro")}));
+  const shown = items.filter(x => st.show[x.r.s]);
+  let h = intro() + `<h2 class="ctx">${esc(o.group)}を通せる${kind === "parent" ? "親カテーテル" : "マイクロカテーテル"}<small>コイルが求める内径 <span class="num">${reqText(o)}</span></small></h2>` + filterBar(items);
+  h += shown.length ? grouped(shown, x => x.series, null, ({o:c, r}) => {
+    const tags = (c.obj && mfrListed(o, c.obj)) ? `<span class="tags"><span class="tag mfr">メーカー記載あり</span></span>` : "";
+    return `<button class="row" data-pick-cat='${esc(JSON.stringify(c.key))}'><span class="dot ${r.s}" role="img" aria-label="${WORD[r.s]}">${SYM[r.s]}</span><span class="rmain">
+      <span class="rtop"><span class="rname">${esc(c.model)}</span><span class="rreq num">${inch(c.idv)}</span></span>
+      <span class="rsub">${esc(c.sub)}</span>${gauge(o, c.idv, kind, r.s, false)}
+      ${r.why ? `<span class="why ${r.s}">${esc(r.why)}</span>` : ""}${tags}</span><span class="chev" aria-hidden="true">›</span></button>`;
+  }) : `<p class="empty">表示する組み合わせがありません</p>`;
+  return h;
+}
+function viewPairResult(c, o){
+  const r = judge(o, c.idv, c.kind);
+  const why = r.why || (r.s === "ok" ? "コイルの添付文書が示す内径の範囲に入っています" : "");
+  const tags = [];
+  if(o.reposition_limit_min) tags.push(`<span class="tag time">カテーテルに入れてから ${o.reposition_limit_min}分以内に離脱</span>`);
+  if(mfrListed(o, c.obj)) tags.push(`<span class="tag mfr">メーカーの記載にこのカテーテル名あり</span>`);
+  const srcRows = x => `<dt>販売名</dt><dd>${esc(x.jp_trade_name) || "—"}</dd><dt>承認番号</dt><dd class="num">${esc(x.approval_no) || "—"}</dd>
+    <dt>出典</dt><dd>${esc({ifu_jp:"国内添付文書", catalog_jp:"国内カタログ", foreign:"海外資料"}[x.source_type] || x.source_type)}</dd><dt>添付文書の版</dt><dd>${esc(x.source_date) || "—"}</dd>${x.note ? `<dt>補足</dt><dd>${esc(x.note)}</dd>` : ""}`;
+  let h = `<article class="verdict ${r.s}" aria-live="polite">
+    <div class="vhead"><span class="vsym" aria-hidden="true">${SYM[r.s]}</span><div><div class="vword">${WORD_LONG[r.s]}</div><div class="vwhy">${esc(why)}</div></div></div>
+    ${o.delivery_via === c.kind ? gauge(o, c.idv, c.kind, r.s, true) + `<div class="legend"><span><i></i>コイルが求める内径</span><span><i class="m"></i>このカテーテル</span></div>` : ""}
+    <div class="vnums"><div><span class="k">カテーテル内径</span><b class="num">${inch(c.idv)}</b><small class="num">${mm(c.idv)}</small></div>
+      <div><span class="k">コイルが求める内径</span><b class="num">${reqText(o)}</b><small>${o.delivery_via === "parent" ? "親カテーテルで送る" : "マイクロカテーテルで送る"}</small></div></div>
+    ${tags.length ? `<div class="tags">${tags.join("")}</div>` : ""}</article>`;
+  h += `<details class="spec" open><summary><span class="k">コイル</span>${esc(o.group)}</summary><dl>
+    <dt>適合内径</dt><dd class="num">${reqText(o)}</dd>${o.size_condition && o.size_condition !== "全サイズ" ? `<dt>対象</dt><dd>${esc(o.size_condition)}</dd>` : ""}
+    <dt>表面</dt><dd>${esc(SURF[o.surface] || o.surface)}</dd><dt>離脱</dt><dd>${esc(o.detach_device) || "—"}</dd>
+    ${o.mfr_listed_catheters ? `<dt>メーカー記載</dt><dd>${esc(o.mfr_listed_catheters)}</dd>` : ""}${srcRows(o)}</dl></details>`;
+  if(c.obj){ const k = c.obj; h += `<details class="spec"><summary><span class="k">カテーテル</span>${esc(k.model)}</summary><dl>
+    <dt>先端/手元内径</dt><dd class="num">${inch(k.id_distal_in)} / ${inch(k.id_proximal_in)}</dd><dt>外径</dt><dd class="num">${k.od_distal_fr ?? "—"} / ${k.od_proximal_fr ?? "—"} Fr</dd>
+    <dt>有効長</dt><dd class="num">${esc((k.lengths_cm || "—").replaceAll(";", " / "))} cm</dd>${k.min_guide_id_in ? `<dt>通せる親</dt><dd class="num">内径 ${inch(k.min_guide_id_in)} 以上</dd>` : ""}${srcRows(k)}</dl></details>`; }
+  h += `<div class="acts2"><button class="btn" data-clear="coil">ほかのコイル</button><button class="btn" data-clear="cat">ほかのカテーテル</button></div>`;
+  return h;
+}
+function render(){
+  const c = resolveCat(st.cat), o = st.coil ? coilById(st.coil) : null;
+  renderPair(c, o);
+  let h;
+  if(c && o) h = viewPairResult(c, o);
+  else if(c) h = viewCoils(c);
+  else if(o) h = viewCats(o);
+  else h = intro() + `<div class="empty"><span>カテーテルかコイルのどちらかをえらぶと、組み合わせを表示します</span><button class="btn primary" data-open="cat">カテーテルからえらぶ</button><button class="btn" data-open="coil">コイルからえらぶ</button></div>`;
+  $("#out").innerHTML = h;
+  save();
+}
+
+/* ---------- 選ぶシート ---------- */
+let sheet = null; /* {which, seg, q} */
+function openSheet(which){
+  sheet = {which, seg: which === "cat" && st.cat?.t === "parent" ? "parent" : "micro", q:""};
+  $("#sheet").hidden = false; document.documentElement.classList.add("lock");
+  drawSheet();
+}
+function closeSheet(){ sheet = null; $("#sheet").hidden = true; document.documentElement.classList.remove("lock"); }
+function searchBox(ph){
+  return `<label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="${ph}" autocomplete="off" enterkeyhint="search" aria-label="検索"></label>`;
+}
+function manualBox(label, ph){
+  return `<div class="manual"><label for="mid">${label}</label><div class="mrow"><input id="mid" inputmode="decimal" placeholder="${ph}" autocomplete="off"><span>inch</span><button class="btn primary" id="mid-go">この内径で見る</button></div><span class="conv" id="mid-conv" aria-live="polite"></span></div>`;
+}
+function drawSheet(){
+  const b = $("#sheet-body");
+  if(sheet.which === "terms"){
+    $("#sheet-title").textContent = "ご利用にあたって";
+    b.innerHTML = `<div class="terms"><ol>${TERMS.map(t => `<li>${t}</li>`).join("")}</ol></div><button class="btn primary" data-close data-ack>わかりました</button>`;
+    return;
+  }
+  if(sheet.which === "cat"){
+    $("#sheet-title").textContent = "カテーテルをえらぶ";
+    b.innerHTML = `<div class="seg" role="tablist"><button role="tab" data-seg="micro" aria-selected="${sheet.seg === "micro"}">マイクロカテーテル</button><button role="tab" data-seg="parent" aria-selected="${sheet.seg === "parent"}">親カテーテル</button></div>` +
+      (sheet.seg === "micro"
+        ? searchBox("名前で検索（カーネリアン、1018 など）") + `<div class="plist" id="plist"></div>` + manualBox("一覧にないときは先端内径を入力", "0.021")
+        : `<div class="presets">${PARENT_PRESETS.map(v => `<button data-parent="${v}" aria-pressed="${st.cat?.t === "parent" && Math.abs(st.cat.v - v) < EPS}">${v}″</button>`).join("")}</div>` + manualBox("ほかの内径を入力", "0.040"));
+  }else{
+    $("#sheet-title").textContent = "コイルをえらぶ";
+    b.innerHTML = searchBox("名前で検索（アズール、Target など）") + `<div class="plist" id="plist"></div>`;
+  }
+  const q = $("#q"); if(q) q.oninput = () => { sheet.q = q.value; drawList(); };
+  const m = $("#mid"); if(m){ m.oninput = () => manualHint(m.value); $("#mid-go").onclick = () => useManual(m.value); m.onkeydown = e => { if(e.key === "Enter") useManual(m.value); }; }
+  if($("#plist")) drawList();
+}
+function hay(parts){ const s = norm(parts.join(" ")); return s + " " + Object.entries(ALIAS).filter(([en]) => s.includes(en)).map(([, ja]) => ja).join(" "); }
+const CAT_HAY = Object.fromEntries(DATA.catheters.map(c => [c.cat_id, hay([c.model, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name])]));
+const COIL_HAY = Object.fromEntries(DATA.coils.map(c => [c.coil_id, hay([c.group, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name, c.size_condition, SURF[c.surface]])]));
+function drawList(){
+  const q = norm(sheet.q), el = $("#plist");
+  const groups = [];
+  if(sheet.which === "cat"){
+    const item = c => `<button class="pi${st.cat?.t === "micro" && st.cat.id === c.cat_id ? " on" : ""}" data-pick-cat='${esc(JSON.stringify({t:"micro", id:c.cat_id}))}'>
+      <span class="pn">${esc(c.model)}</span><span class="pv num">${inch(c.id_distal_in)}</span><span class="pm">${esc(c.manufacturer)} · ${c.od_distal_fr ?? "—"}Fr</span></button>`;
+    const hits = DATA.catheters.filter(c => !q || CAT_HAY[c.cat_id].includes(q));
+    if(!q){ const rec = st.rec.cat.map(k => JSON.parse(k)).filter(k => k.t === "micro").map(k => catById(k.id)).filter(Boolean); if(rec.length) groups.push(["最近えらんだもの", rec.map(item)]); }
+    const m = new Map(); hits.forEach(c => { if(!m.has(c.series)) m.set(c.series, []); m.get(c.series).push(item(c)); });
+    groups.push(...m.entries());
+  }else{
+    const item = c => `<button class="pi${st.coil === c.coil_id ? " on" : ""}" data-pick-coil="${esc(c.coil_id)}">
+      <span class="pn">${esc(c.group)}</span><span class="pv num">${reqText(c)}</span><span class="pm">${esc(c.manufacturer)}${c.size_condition && c.size_condition !== "全サイズ" ? " · " + esc(c.size_condition) : ""}</span></button>`;
+    const hits = DATA.coils.filter(c => !q || COIL_HAY[c.coil_id].includes(q));
+    if(!q){ const rec = st.rec.coil.map(k => coilById(JSON.parse(k))).filter(Boolean); if(rec.length) groups.push(["最近えらんだもの", rec.map(item)]); }
+    SURF_ORDER.forEach(s => { const l = hits.filter(c => c.surface === s); if(l.length) groups.push([SURF[s], l.map(item)]); });
+  }
+  el.innerHTML = groups.length ? groups.map(([k, l]) => `<div class="pg"><h3>${esc(k)}</h3><div class="list">${l.join("")}</div></div>`).join("")
+    : `<p class="none">「${esc(sheet.q)}」に当たるものがありません</p>`;
+}
+function parseIn(s){ const v = parseFloat(String(s).normalize("NFKC")); return isFinite(v) ? v : null; }
+function manualHint(s){
+  const el = $("#mid-conv"), v = parseIn(s); el.className = "conv";
+  if(v == null){ el.textContent = ""; return; }
+  if(v >= 0.005 && v <= 0.1){ el.textContent = `＝ ${mm(v)}`; return; }
+  if(v >= 0.2 && v <= 2.6){ const iv = +(v / 25.4).toFixed(4); el.innerHTML = `mm で入力しましたか？ ${v} mm ＝ ${iv}″<button data-mm="${iv}">${iv}″ で見る</button>`; return; }
+  el.className = "conv err"; el.textContent = "0.005〜0.100 の範囲で、inch で入力してください";
+}
+function useManual(s){
+  const v = parseIn(s);
+  if(v == null || v < 0.005 || v > 0.1){ manualHint(s); return; }
+  const key = sheet.which === "cat" && sheet.seg === "parent" ? {t:"parent", v} : {t:"manual", v};
+  st.cat = key; remember("cat", key); closeSheet(); render(); scrollTo({top:0});
+}
+const TERMS = [
+  "このツールは、国内の添付文書・メーカーのカタログなど公開されている資料から、カテーテルの内径とコイルが求める内径を照らし合わせて表示する参考情報です。医療機器どうしの適合や安全性を保証するものではありません。",
+  "判定に使っているのは内径の数値だけです。カテーテルの柔らかさや屈曲、マーカーの数と位置、親カテーテルとの組み合わせ、離脱装置、ハイドロゲルコイルの留置までの時間などは考えていません。",
+  "○は「添付文書に書かれた内径の範囲に入る」という意味です。メーカーがその組み合わせで動作を確かめたことを意味しません。他社製カテーテルとの併用を推奨しないと書いている添付文書もあります。",
+  "△は、添付文書に内径の上限や基準が書かれていないものです。使えるかどうかはわかりません。",
+  "データには誤りや、添付文書の改訂が反映されていない部分がありえます。画面上部の「データ」の日付を確かめ、使用前には必ず最新の添付文書・メーカーの情報を確認してください。",
+  "使うかどうか、どう使うかは、使用する医師が自分の判断と責任で決めてください。作成者は、このツールを使ったことで生じた結果について責任を負いません。",
+  "このツールは個人が作成したもので、各メーカーとは関係ありません。製品名は各社の商標です。"];
+
+/* ---------- 操作 ---------- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button,[data-close]"); if(!t) return;
+  const d = t.dataset;
+  if(d.ack !== undefined){ st.ack = true; if(d.close !== undefined) closeSheet(); render(); return; }
+  if(d.close !== undefined){ closeSheet(); return; }
+  if(d.terms !== undefined || t.id === "info"){ sheet = {which:"terms"}; $("#sheet").hidden = false; document.documentElement.classList.add("lock"); drawSheet(); return; }
+  if(d.open){ openSheet(d.open); return; }
+  if(d.clear){ st[d.clear] = null; render(); return; }
+  if(d.fl){ st.show[d.fl] = !st.show[d.fl]; render(); return; }
+  if(d.seg){ sheet.seg = d.seg; drawSheet(); return; }
+  if(d.parent){ const key = {t:"parent", v:+d.parent}; st.cat = key; remember("cat", key); closeSheet(); render(); scrollTo({top:0}); return; }
+  if(d.mm){ $("#mid").value = d.mm; useManual(d.mm); return; }
+  if(d.pickCat){ const key = JSON.parse(d.pickCat); st.cat = key; remember("cat", key); if(sheet) closeSheet(); render(); scrollTo({top:0, behavior:"smooth"}); return; }
+  if(d.pickCoil){ st.coil = d.pickCoil; remember("coil", d.pickCoil); if(sheet) closeSheet(); render(); scrollTo({top:0, behavior:"smooth"}); return; }
+});
+document.addEventListener("keydown", e => { if(e.key === "Escape" && sheet) closeSheet(); });
+$("#built").textContent = DATA.built;
+render();
+</script>

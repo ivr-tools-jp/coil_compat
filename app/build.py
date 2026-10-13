@@ -40,6 +40,10 @@ def build_site(out):
     out.mkdir(parents=True, exist_ok=True)
     page = (pwa / "head.html").read_text(encoding="utf-8") + html + (pwa / "tail.html").read_text(encoding="utf-8")
     (out / "index.html").write_text(page, encoding="utf-8")
+    beta = ROOT / "design" / "v3_proto_template.html"  # 新デザインの試作。公開版とは別ページ（beta.html）で試す
+    if beta.exists():
+        t = beta.read_text(encoding="utf-8").replace("/*__DATA__*/null", json.dumps(data, ensure_ascii=False))
+        (out / "beta.html").write_text((pwa / "beta_head.html").read_text(encoding="utf-8") + t, encoding="utf-8")
     shutil.copy(pwa / "manifest.webmanifest", out)
     icons = sorted(static.glob("*.png"))
     for f in icons:
