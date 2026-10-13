@@ -95,6 +95,7 @@ details.fold>summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8p
 details.fold .results{margin-top:6px}
 
 .empty{margin-top:24px;color:var(--muted);text-align:center;font-size:14px}
+.empty.err{color:var(--flag);font-weight:700}
 .notice a{color:var(--accent)}
 .terms{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
 .terms h2{font-size:13px;margin:0 0 6px;color:var(--fg)}
@@ -144,7 +145,10 @@ const SYM = {ok:"○", warn:"△", ng:"×"};
 const RANK = {ok:0, warn:1, ng:2};
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const inch = v => v == null ? "—" : `${+v.toFixed(4)}″`;
+const inch = v => v == null ? "—" : `${v.toFixed(4).replace(/0$/, "")}″`;  /* 0.040 を 0.04 にしない（小数3桁は残す） */
+const ID_MIN = 0.005, ID_MAX = 0.1;  /* 手入力で受け付ける内径（inch） */
+const idOk = v => v >= ID_MIN && v <= ID_MAX;
+const ID_ERR = `${ID_MIN.toFixed(3)}〜${ID_MAX.toFixed(3)} の範囲で、inch で入力してください（mm なら 25.4 で割る）`;
 
 function store(k, v){ try{ if(v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); }catch(e){ return null; } }
 
@@ -237,7 +241,7 @@ function viewCatheter(){
   h += `<button class="chip" data-cs="__parent" aria-pressed="${parent}">親カテーテル</button></div>`;
   if(parent){
     h += `<span class="label">親カテーテルの内径</span><div class="chips">` +
-      PARENT_PRESETS.map(v => `<button class="chip num" data-pid="${v}" aria-pressed="${Math.abs((stC.pid||0)-v)<EPS}">${v}″</button>`).join("") + `</div>`;
+      PARENT_PRESETS.map(v => `<button class="chip num" data-pid="${v}" aria-pressed="${!stC.pidManual && Math.abs((stC.pid||0)-v)<EPS}">${v}″</button>`).join("") + `</div>`;
     h += `<div class="manual"><input id="pid-in" inputmode="decimal" placeholder="0.040" value="${stC.pidManual ?? ""}" aria-label="親カテーテル内径を入力"><span class="hint">inch で直接入力</span></div>`;
   }else if(stC.series === "__manual"){
     h += ``;
@@ -249,10 +253,15 @@ function viewCatheter(){
   h += `</section>`;
 
   let cat = null, id = null, kind = parent ? "parent" : "micro", title = "";
-  if(parent){ id = stC.pid; title = id ? `親カテーテル　内径 ${inch(id)}` : ""; }
-  else if(stC.midManual){ id = parseFloat(stC.midManual); title = `マイクロカテーテル（入力）　先端内径 ${inch(id)}`; }
+  let bad = false;
+  if(parent){
+    if(stC.pidManual){ id = parseFloat(stC.pidManual); bad = !idOk(id); } else id = stC.pid;
+    title = id ? `親カテーテル　内径 ${inch(id)}` : "";
+  }
+  else if(stC.midManual){ id = parseFloat(stC.midManual); bad = !idOk(id); title = `マイクロカテーテル（入力）　先端内径 ${inch(id)}`; }
   else { cat = DATA.catheters.find(c => c.cat_id === stC.id); if(cat){ id = cat.id_distal_in; title = cat.model; } }
 
+  if(bad){ $("#view").innerHTML = h + `<p class="empty err">${ID_ERR}</p>`; return bindCat(); }
   if(!id || !(id > 0)){ $("#view").innerHTML = h + `<p class="empty">カテーテルを選ぶか内径を入力すると、使えるコイルを表示します</p>`; return bindCat(); }
 
   h += `<div class="sel"><span class="name">${esc(title)}</span>`;
@@ -280,8 +289,8 @@ function bindCat(){
     save(); render(); });
   document.querySelectorAll("[data-cid]").forEach(b => b.onclick = () => { stC.id = b.dataset.cid; stC.midManual = ""; save(); render(); });
   document.querySelectorAll("[data-pid]").forEach(b => b.onclick = () => { stC.pid = +b.dataset.pid; stC.pidManual = ""; save(); render(); });
-  const p = $("#pid-in"); if(p) p.onchange = () => { const v = parseFloat(p.value); stC.pidManual = p.value; if(v > 0) stC.pid = v; save(); render(); };
-  const m = $("#mid-in"); if(m) m.onchange = () => { stC.midManual = parseFloat(m.value) > 0 ? m.value : ""; save(); render(); };
+  const p = $("#pid-in"); if(p) p.onchange = () => { stC.pidManual = p.value.trim(); stC.pid = null; save(); render(); };
+  const m = $("#mid-in"); if(m) m.onchange = () => { stC.midManual = m.value.trim(); save(); render(); };
 }
 
 /* ---------- コイルから ---------- */
@@ -293,11 +302,17 @@ let stK = store("cc.coil") || {};
 { const c0 = DATA.coils.find(c => c.coil_id === stK.id) || DATA.coils[0];
   stK = {surf: c0.surface, series: c0.series, id: c0.coil_id}; }
 
+/* タイプ・サイズのボタン名：シリーズ名を除き、全体がかっこで囲まれているときだけ外す（「CX（18型）」の閉じかっこは残す） */
+function chipLabel(c){
+  let s = c.group.replace(c.series, "").trim();
+  if(/^[（(].*[)）]$/.test(s)) s = s.slice(1, -1).trim();
+  return s || c.group;
+}
 function viewCoil(){
   let h = `<section class="pick">` + coilSurfs.map(sf => `<span class="label">${esc(SURF[sf]||sf)}</span><div class="chips">` +
     seriesOf(sf).map(s => `<button class="chip" data-ksf="${esc(sf)}" data-ks="${esc(s)}" aria-pressed="${stK.surf===sf && stK.series===s}">${esc(s)}</button>`).join("") + `</div>`).join("");
   h += `<span class="label">タイプ・サイズ</span><div class="chips">` + DATA.coils.filter(c => c.series === stK.series && c.surface === stK.surf)
-    .map(c => `<button class="chip" data-kid="${c.coil_id}" aria-pressed="${stK.id===c.coil_id}">${esc(c.group.replace(c.series,"").replace(/^[\s（(]+|[)）]$/g,"").trim()||c.group)}${c.size_condition && c.size_condition!=="全サイズ" ? `<small>${esc(c.size_condition)}</small>` : ""}</button>`).join("") + `</div></section>`;
+    .map(c => `<button class="chip" data-kid="${c.coil_id}" aria-pressed="${stK.id===c.coil_id}">${esc(chipLabel(c))}${c.size_condition && c.size_condition!=="全サイズ" ? `<small>${esc(c.size_condition)}</small>` : ""}</button>`).join("") + `</div></section>`;
   const o = DATA.coils.find(c => c.coil_id === stK.id);
   if(!o){ $("#view").innerHTML = h; return bindCoil(); }
   h += `<div class="sel"><span class="name">${esc(o.group)}</span><div class="spec">
