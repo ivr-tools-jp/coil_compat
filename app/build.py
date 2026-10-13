@@ -4,10 +4,11 @@
   python app/build.py [出力先パス]   Artifact 用（head の無い断片。1ファイル）
   python app/build.py --site DIR     公開用（PWA）。DIR に index.html・manifest・sw.js・アイコンを出す
 """
-import csv, json, sys, datetime, hashlib, shutil
+import csv, json, sys, datetime, hashlib, re, shutil, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Windows の画面でも知らせの文字で止まらないように
 NUM = {"id_min_in", "id_max_in", "reposition_limit_min", "id_distal_in", "id_proximal_in",
        "od_distal_fr", "od_proximal_fr", "max_gw_in", "min_guide_id_in", "upper_id_in"}
 
@@ -24,16 +25,40 @@ def load(name):
     return rows
 
 
+def built_date():
+    """「データ作成」の日付＝画面かデータを最後に直したコミットの日。ビルドした日にすると、
+    README を直しただけの push でも毎日中身が変わり「新しいデータがあります」が出てしまう。
+    （Actions では checkout に fetch-depth: 0 が要る）"""
+    try:
+        d = subprocess.run(["git", "log", "-1", "--format=%cs", "--", "data", "app"], cwd=ROOT,
+                           capture_output=True, text=True, check=True).stdout.strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+            return d
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    return datetime.date.today().isoformat()
+
+
 data = {
     "coils": load("coils.csv"),
     "catheters": load("catheters.csv"),
     "limits": load("platform_limits.csv"),
-    "built": datetime.date.today().isoformat(),
 }
+# データの版（共有リンクに入れ、受け取った側のデータと同じかを確かめる）
+data["ver"] = hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:8]
+data["built"] = built_date()
 # 画面上部の「添付文書と照合」の日付：照合した日のうち、いちばん古いもの（どの製品もこの日以降に確かめてある）
-data["checked"] = min((r["checked_date"] for r in data["coils"] + data["catheters"] if r.get("checked_date")), default="")
+rows = data["coils"] + data["catheters"]
+bad = [r.get("coil_id") or r.get("cat_id") for r in rows if r.get("checked_date") and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", r["checked_date"])]
+if bad:
+    sys.exit(f"checked_date の形が YYYY-MM-DD でない行: {', '.join(bad)}")
+data["checked"] = min((r["checked_date"] for r in rows if r.get("checked_date")), default="")
+data["unchecked"] = sum(1 for r in rows if not r.get("checked_date"))  # 照合日のない行（画面に「未照合あり」と出す）
+if data["unchecked"]:
+    print(f"注意：照合日（checked_date）のない行が {data['unchecked']} 行あります")
 html = (ROOT / "app" / "template.html").read_text(encoding="utf-8")
-html = html.replace("/*__DATA__*/null", json.dumps(data, ensure_ascii=False))
+# データに </script> などが入っても壊れないよう < をエスケープして埋め込む
+html = html.replace("/*__DATA__*/null", json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))
 
 
 def build_site(out):
@@ -70,7 +95,8 @@ def check_font(page):
         print("注意：フォントがありません。python tools/make_fonts.py を実行してください")
         return
     have = set(f.read_text(encoding="utf-8"))
-    miss = sorted({c for c in page if ord(c) > 0x7F and c not in have and not c.isspace()})
+    shown = re.sub(r"/\*.*?\*/|<!--.*?-->", "", page, flags=re.S)  # コメントの文字は画面に出ないので数えない
+    miss = sorted({c for c in shown if ord(c) > 0x7F and c not in have and not c.isspace()})
     if miss:
         print("注意：同梱フォントにない文字 → python tools/make_fonts.py で作り直す：", "".join(miss))
 

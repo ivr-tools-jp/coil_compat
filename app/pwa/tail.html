@@ -6,10 +6,15 @@ if ("serviceWorker" in navigator) {
       const had = !!navigator.serviceWorker.controller;  /* 初めて開いたときは知らせない */
       const reg = await navigator.serviceWorker.register("sw.js");
       const box = document.getElementById("upd");
+      let asked = false;  /* 「更新する」を押した。初めて開いたページでも、切り替わったら読み直す */
       const show = w => {
         if (!w || !navigator.serviceWorker.controller) return;
         box.hidden = false;
-        document.getElementById("upd-go").onclick = () => w.postMessage("skip");
+        document.getElementById("upd-go").onclick = () => {
+          asked = true;
+          box.querySelector("span").textContent = "切り替えています…";
+          w.postMessage("skip");
+        };
       };
       show(reg.waiting);
       reg.addEventListener("updatefound", () => {
@@ -17,7 +22,7 @@ if ("serviceWorker" in navigator) {
         if (w) w.addEventListener("statechange", () => { if (w.state === "installed") show(w); });
       });
       let reloaded = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => { if (had && !reloaded) { reloaded = true; location.reload(); } });
+      navigator.serviceWorker.addEventListener("controllerchange", () => { if ((had || asked) && !reloaded) { reloaded = true; location.reload(); } });
       /* ホーム画面から開き直したとき（裏から戻ったとき）にも新しい版を探す */
       document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
     } catch (e) {}

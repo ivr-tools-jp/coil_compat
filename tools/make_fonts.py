@@ -35,6 +35,7 @@ def used_chars():
 def main(src):
     OUT.mkdir(parents=True, exist_ok=True)
     chars = used_chars()
+    covered = None
     for w, name in [("400", "Regular"), ("700", "Bold")]:
         opt = subset.Options()
         opt.flavor = "woff2"
@@ -45,14 +46,18 @@ def main(src):
         s = subset.Subsetter(opt)
         s.populate(text=chars)
         s.subset(font)
+        cmap = {chr(u) for u in font.getBestCmap()}
+        covered = cmap if covered is None else covered & cmap
         out = OUT / f"bizudpgothic-{w}.woff2"
         subset.save_font(font, str(out), opt)
         print(f"{out.name}  {out.stat().st_size // 1024} KB")
     for w in ["Medium", "SemiBold"]:
         shutil.copy(src / f"IBMPlexMono-{w}.woff2", OUT)
-    # build.py が「フォントにない文字」を調べるための一覧
-    (OUT / "bizudpgothic-chars.txt").write_text(chars, encoding="utf-8")
-    print(f"{len(chars)} 文字")
+    # build.py が「フォントにない文字」を調べるための一覧（実際にフォントに入った文字だけ。元フォントにない字は入らない）
+    have = "".join(sorted(set(chars) & covered))
+    (OUT / "bizudpgothic-chars.txt").write_text(have, encoding="utf-8")
+    lack = "".join(sorted(set(chars) - covered - set(" ")))
+    print(f"{len(have)} 文字" + (f"（元フォントにない文字：{lack}）" if lack else ""))
 
 
 if __name__ == "__main__":

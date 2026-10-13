@@ -7,8 +7,12 @@ const ASSETS = __ASSETS__;
 const TOP = new URL("./", self.location).pathname;  /* 公開版のトップ（…/coil_compat/） */
 
 self.addEventListener("install", e => {
-  /* HTTP のキャッシュ（GitHub Pages は10分）に古い版が残っていても、必ず新しく取る */
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, {cache:"reload"})))));
+  /* ブラウザの HTTP キャッシュも配信側（CDN）のキャッシュも飛ばして、この版のものを取る（?v= を付けて取り、付けない名前で写す） */
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(ASSETS.map(async u => {
+    const res = await fetch(new Request(u + (u.includes("?") ? "&" : "?") + "v=__VERSION__", {cache:"reload"}));
+    if(!res.ok) throw new Error(u + " " + res.status);
+    await c.put(u, res);
+  }))));
 });
 
 self.addEventListener("message", e => { if(e.data === "skip") self.skipWaiting(); });
@@ -27,8 +31,11 @@ self.addEventListener("fetch", e => {
   /* トップ（…/ と …/index.html）だけを写しから出す。ほかのページ（beta.html など）はネットに任せる */
   if(req.mode === "navigate"){
     if(url.pathname === TOP || url.pathname === TOP + "index.html")
-      e.respondWith(caches.match("./").then(hit => hit || fetch(req)));
+      e.respondWith(caches.match("./").catch(() => null).then(hit => hit || fetch(req)));
+    /* 試作だった beta.html はトップへ（電波がなくても。# の共有リンクはブラウザが引き継ぐ） */
+    else if(url.pathname === TOP + "beta.html") e.respondWith(Response.redirect(TOP, 302));
     return;
   }
-  e.respondWith(caches.match(req, {ignoreSearch:true}).then(hit => hit || fetch(req)));
+  /* 写しが読めない（CacheStorage の不具合など）ときもネットで開けるように */
+  e.respondWith(caches.match(req, {ignoreSearch:true}).catch(() => null).then(hit => hit || fetch(req)));
 });
