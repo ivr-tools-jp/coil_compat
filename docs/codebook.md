@@ -13,6 +13,7 @@
 | distributor_jp | 国内の製造販売元・販売元 | |
 | series | シリーズ名 | |
 | group | 画面に出す名前 | |
+| search_alias | 検索用の読み・別名 | カタカナで書く（ひらがなで探しても当たる）。複数は `;` 区切り。画面には出さない |
 | size_condition | この行が当てはまるサイズ | 「全サイズ」「コイル径 2〜10mm」「一次コイル外径 0.010″」など |
 | platform | コイルの系統 | 10 / 18 / 35。不明は空欄 |
 | detachable | 離脱式か | 1＝離脱式、0＝プッシャブル |
@@ -31,6 +32,7 @@
 | source_ref | 出典ファイル・資料名 | `docs/sources.md` に URL |
 | source_date | 添付文書の改訂年月・版 | 改訂の追跡用。カタログが出典の行（マイクロカテーテルなど）も、その製品の国内添付文書の版を入れる。未入手は「添付文書未入手」 |
 | verified | 原本と照合済みか | 0＝未照合、1＝照合済み |
+| checked_date | 原本と照合した日 | YYYY-MM-DD。画面上部の「添付文書と照合」には全行（コイル・カテーテル）のうち最も古い日を出す。直したら照合し直して更新する |
 | note | 補足 | |
 
 ### id_rule（添付文書の書き方）
@@ -52,6 +54,7 @@
 | cat_id | 行の ID | |
 | manufacturer / distributor_jp | 製造元／国内の販売元 | |
 | series / model | シリーズ名／モデル名 | |
+| search_alias | 検索用の読み・別名 | coils.csv と同じ |
 | part_no_examples | 品番の例 | |
 | id_distal_in | 先端側の内径 | inch。**判定に使う値** |
 | id_proximal_in | 手元側の内径 | inch。テーパーがなければ先端と同じ |
@@ -60,7 +63,7 @@
 | max_gw_in | 適合する最大ガイドワイヤ径 | inch |
 | min_guide_id_in | 通せる親カテーテル（ガイディング）の最小内径 | inch。Triaxial で組むときの目安。記載なしは空欄 |
 | jp_trade_name / approval_no | 国内の販売名／承認番号 | |
-| source_type / source_ref / source_date / verified / note | coils.csv と同じ | |
+| source_type / source_ref / source_date / verified / checked_date / note | coils.csv と同じ | |
 
 親カテーテルは登録しない。画面で内径を選ぶか直接入力する。
 

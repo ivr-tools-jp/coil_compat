@@ -1,159 +1,360 @@
 <title>コイル適合チェッカー</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-/* Layout: 1カラムの操作画面。上部に固定タブ、選択チップ → 判定一覧（○△×の順、×はたたむ） */
+/* フォントは公開用の一式（app/static/fonts）に同梱。tools/make_fonts.py で作る。Artifact では端末のフォントになる */
+@font-face{font-family:"BIZ UDPGothic";font-weight:400;font-display:swap;src:url(fonts/bizudpgothic-400.woff2) format("woff2")}
+@font-face{font-family:"BIZ UDPGothic";font-weight:700;font-display:swap;src:url(fonts/bizudpgothic-700.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:500;font-display:swap;src:url(fonts/IBMPlexMono-Medium.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:600;font-display:swap;src:url(fonts/IBMPlexMono-SemiBold.woff2) format("woff2")}
+/* Layout: 片手で使う1カラム。上に「カテーテル＋コイル」の2つの枠（片方が一覧の基準）、下に○△の一覧と×の一覧。
+   組み合わせの判定は一覧の上に重ねるシートで出し、閉じれば元の位置に戻る。配色は design/color_review.md の案 */
 :root{
-  --bg:#eef2f5; --surface:#ffffff; --surface-2:#f6f8fa; --fg:#15212c; --muted:#5a6977; --line:#d5dde4;
-  --accent:#0d6c8c; --accent-fg:#ffffff; --accent-soft:#dcedf3;
-  --ok:#2d6d42; --ok-soft:#dff2e6; --warn:#944e12; --warn-soft:#fbeed6; --warn-fill:#f9b73f; --warn-on:#43260a; --ng:#6f7c88; --ng-soft:#e7ebef;
-  --flag:#9b2c2c; --flag-soft:#f7e3e3;
-  /* 2026-10-13 色の見直し：○と△を明るさでも分ける（△は明るい黄橙＋濃い茶の記号）。値の根拠は design/color_review.md */
+  --bg:#ecf1f3; --surface:#ffffff; --surface-2:#e3ebef; --track:#e3ebef; --fg:#0f1d25; --muted:#50606a;
+  --line:#d0d9de; --line-strong:#7b8891;
+  --accent:#0d6c8c; --accent-fg:#ffffff; --accent-soft:#d4edf7;
+  --ok:#2d6d42; --ok-on:#ffffff; --ok-text:#27673d; --ok-soft:#e0f5e5;
+  --warn:#f9b73f; --warn-on:#43260a; --warn-text:#944e12; --warn-soft:#ffeccd;
+  --ng:#6a767f; --ng-text:#545f68; --ng-soft:#e3e9ed;
+  --flag:#a12f2f; --flag-on:#ffffff;
+  --band:#698595; --mark:#0f1d25;
+  --sz-fg:#4f3189; --sz-line:#6c4ab3; --sz-bg:#f1edff;
+  --sz-mid-fg:#1e1237; --sz-mid-line:#4f3189; --sz-mid-bg:#aea1d9; --sz-hi-fg:#ffffff; --sz-hi-line:#4f3189; --sz-hi-bg:#4f3189;  /* サイズの札：青紫（「注意」の黄橙・放射能の赤紫と重ねない） */
+  --scrim:rgba(8,20,28,.45); --shadow:0 1px 2px rgba(10,30,40,.06),0 8px 24px rgba(10,30,40,.07);
   --font-ui:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
   --font-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
-  --r:10px;
+  --r:16px; --tap:48px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0c1318; --surface:#141f27; --surface-2:#1a2832; --fg:#e4ecf2; --muted:#93a3b2; --line:#26353f;
-  --accent:#4fb0d0; --accent-fg:#06222c; --accent-soft:#16323d;
-  --ok:#5aa572; --ok-soft:#13301f; --warn:#f2b95a; --warn-soft:#352612; --warn-fill:#f5bd56; --warn-on:#2b1c08; --ng:#7d8b98; --ng-soft:#1d2830;
-  --flag:#ef8a8a; --flag-soft:#3a1c1c; color-scheme:dark}}
+  --bg:#0b1115; --surface:#131b1f; --surface-2:#1a242a; --track:#0b1115; --fg:#d0d9de; --muted:#93a1a9;
+  --line:#283238; --line-strong:#647179;
+  --accent:#5bb1d1; --accent-fg:#011e28; --accent-soft:#15323d;
+  --ok:#519866; --ok-on:#0b1a0f; --ok-text:#73bf88; --ok-soft:#192b1e;
+  --warn:#f5bd56; --warn-on:#2b1c08; --warn-text:#f2b95a; --warn-soft:#372813;
+  --ng:#76828b; --ng-text:#93a1a9; --ng-soft:#1f2529;
+  --flag:#ed8b88; --flag-on:#131b1f;
+  --band:#5b7686; --mark:#d0d9de;
+  --sz-fg:#d4c9fb; --sz-line:#9e88da; --sz-bg:#2d2642;
+  --sz-mid-fg:#ffffff; --sz-mid-line:#9e88da; --sz-mid-bg:#634d99; --sz-hi-fg:#1e1237; --sz-hi-line:#c8b9f9; --sz-hi-bg:#c8b9f9;
+  --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0c1318; --surface:#141f27; --surface-2:#1a2832; --fg:#e4ecf2; --muted:#93a3b2; --line:#26353f;
-  --accent:#4fb0d0; --accent-fg:#06222c; --accent-soft:#16323d;
-  --ok:#5aa572; --ok-soft:#13301f; --warn:#f2b95a; --warn-soft:#352612; --warn-fill:#f5bd56; --warn-on:#2b1c08; --ng:#7d8b98; --ng-soft:#1d2830;
-  --flag:#ef8a8a; --flag-soft:#3a1c1c; color-scheme:dark}
+  --bg:#0b1115; --surface:#131b1f; --surface-2:#1a242a; --track:#0b1115; --fg:#d0d9de; --muted:#93a1a9;
+  --line:#283238; --line-strong:#647179;
+  --accent:#5bb1d1; --accent-fg:#011e28; --accent-soft:#15323d;
+  --ok:#519866; --ok-on:#0b1a0f; --ok-text:#73bf88; --ok-soft:#192b1e;
+  --warn:#f5bd56; --warn-on:#2b1c08; --warn-text:#f2b95a; --warn-soft:#372813;
+  --ng:#76828b; --ng-text:#93a1a9; --ng-soft:#1f2529;
+  --flag:#ed8b88; --flag-on:#131b1f;
+  --band:#5b7686; --mark:#d0d9de;
+  --sz-fg:#d4c9fb; --sz-line:#9e88da; --sz-bg:#2d2642;
+  --sz-mid-fg:#ffffff; --sz-mid-line:#9e88da; --sz-mid-bg:#634d99; --sz-hi-fg:#1e1237; --sz-hi-line:#c8b9f9; --sz-hi-bg:#c8b9f9;
+  --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
+  color-scheme:dark}
 
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%}
-.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:0 40px}
+html.lock{overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-button{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.app{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
 
-header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-inline:-16px;padding:10px 16px 0}
-.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-.brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.02em}
-.brand .stamp{font-size:11px;color:var(--muted)}
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
-.tab{border:0;background:transparent;padding:10px 4px 9px;border-bottom:3px solid transparent;color:var(--muted);font-weight:700;cursor:pointer}
-.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+/* ヘッダー（スクロールすると選んだものを1行で出す） */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);margin-inline:-16px;padding:8px 16px;border-bottom:1px solid transparent}
+.bar.scrolled{border-bottom-color:var(--line)}
+.bar-row{display:flex;align-items:center;gap:8px}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:21px;height:21px}
+.brand{display:flex;flex-direction:column;min-width:0;line-height:1.25;flex:1}
+.brand b{font-weight:700;font-size:17px}
+.brand small{font-size:12px;color:var(--muted)}
+.hbtn{min-width:var(--tap);height:var(--tap);border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:700;color:var(--fg);padding:0 10px;flex:none}
+.mini[hidden]{display:none}
+.mini{margin-top:6px;font-size:14px;font-weight:700;display:flex;gap:8px;align-items:baseline;min-width:0}
+.mini span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini .num{flex:none}
+.caution{margin:4px 0 12px;font-size:13px;color:var(--fg);line-height:1.5}
+.caution button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px;font-size:13px;min-height:auto}
 
-.notice{margin-top:12px;font-size:12px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
-.notice b{color:var(--flag)}
+/* 2つの枠 */
+.pair{display:grid;grid-template-columns:1fr 26px 1fr;align-items:stretch}
+.slot{position:relative;min-width:0;border-radius:var(--r);background:var(--surface);border:2px dashed var(--line-strong);display:flex;flex-direction:column}
+.slot.on{border:2px solid var(--accent);box-shadow:var(--shadow)}
+.slot-main{flex:1;min-width:0;border:0;background:none;text-align:left;padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px;min-height:112px;border-radius:14px}
+.slot-k{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);min-height:28px;display:flex;align-items:center}
+.slot-v{font-weight:700;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.slot:not(.on) .slot-v{color:var(--accent)}
+.slot-n{margin-top:auto;font-size:16px;font-weight:600}
+.slot-n small{font-size:12px;color:var(--muted);font-weight:500;margin-left:4px;font-family:var(--font-ui)}
+.slot-clear{position:absolute;top:0;right:0;min-width:var(--tap);height:var(--tap);border:0;background:none;padding:0 8px;display:grid;place-items:center}
+.slot-clear span{font-size:12.5px;font-weight:700;color:var(--fg);border:1px solid var(--line-strong);border-radius:999px;padding:3px 10px;background:var(--surface)}
+.stale{align-self:flex-start;font-size:12px;font-weight:700;background:var(--warn-soft);color:var(--warn-text);border-radius:6px;padding:2px 7px;margin-top:4px}
+.plus{display:grid;place-items:center;color:var(--muted);font-weight:700;font-size:22px}
 
-section.pick{margin-top:14px;display:flex;flex-direction:column;gap:10px}
-.label{font-size:11px;letter-spacing:.08em;color:var(--muted);font-weight:700}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:14px;cursor:pointer;min-height:38px}
-.chip small{color:var(--muted);margin-left:4px}
-.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
-.chip[aria-pressed="true"] small{color:inherit;opacity:.8}
-.manual{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.manual input{width:7.5em;font:inherit;font-family:var(--font-num);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
-.manual .hint{font-size:12px;color:var(--muted)}
+/* はじめに */
+.intro{margin-top:14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:10px}
+.intro b{font-size:16px}
+.intro p{margin:0;font-size:14px}
+.intro .fine{font-size:13px;color:var(--muted)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:var(--tap);border-radius:12px;padding:0 16px;border:1px solid var(--line-strong);background:var(--surface);font-weight:700;font-size:15px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 
-.sel{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
-.sel .name{font-weight:700;font-size:16px}
-.sel .spec{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
-.sel .spec b{color:var(--fg);font-weight:600}
+/* 一覧 */
+.ctx{margin:22px 2px 0;font-size:18px;font-weight:700;line-height:1.4;text-wrap:balance}
+.ctx small{display:block;font-weight:400;font-size:14px;color:var(--fg);margin-top:2px}
+.tally{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:10px 2px 0;font-size:15px;font-weight:700}
+.tally span{display:inline-flex;align-items:center;gap:6px}
+.tally .num{font-size:16px}
+.tally button{border:0;background:none;padding:0 4px;min-height:var(--tap);color:var(--accent);text-decoration:underline;text-underline-offset:3px;font-weight:700;font-size:14px}
+.group{margin-top:18px}
+.gh{display:flex;align-items:baseline;gap:8px;margin:0 4px 6px;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.gh .gc{margin-left:auto;font-family:var(--font-num);letter-spacing:0}
+.list{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.row{width:100%;border:0;background:none;text-align:left;display:flex;gap:12px;align-items:flex-start;padding:14px 12px 14px 14px;border-top:1px solid var(--line);min-height:56px}
+.row:first-child{border-top:0}
+.row:active{background:var(--surface-2)}
+.mk{flex:none;display:block}
+.rmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.rtop{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.rname{font-weight:700;font-size:16px;line-height:1.35;min-width:0;flex:1 1 10em;overflow-wrap:anywhere}
+.rreq{flex:none;margin-left:auto;font-size:15px;font-weight:600;color:var(--fg);white-space:nowrap}
+.ia{display:inline-block;min-width:7ch;text-align:left}
+.rsub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.why{font-size:15px;line-height:1.5;color:var(--fg)}
+.why.warn{color:var(--warn-text)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:13px;border-radius:6px;padding:2px 8px;font-weight:700;white-space:nowrap}
+.tag.time{background:var(--warn-soft);color:var(--warn-text)}
+.tag.mfr{background:var(--accent-soft);color:var(--accent)}
+.tag.unv{background:var(--flag);color:var(--flag-on)}
+.chev{flex:none;align-self:center;color:var(--muted);font-size:22px;line-height:1}
+.row.sel{background:var(--accent-soft)}
+/* 同じ名前でサイズ違いのコイル（Concerto など）を取り違えないよう、サイズを名前の横の札にする */
+.sz{display:inline-block;margin-left:6px;font-size:13.5px;font-weight:700;line-height:1.4;padding:1px 8px;border-radius:6px;border:1.5px solid var(--sz-line);background:var(--sz-bg);color:var(--sz-fg);vertical-align:2px;white-space:nowrap;font-family:var(--font-ui);font-weight:400}
+.sz b{font-weight:700}
+/* 同じ名前の兄弟品だけ、小さい径から 薄→(中)→濃。意味は「同じ名前の中の順番」だけ */
+.sz.mid{border-color:var(--sz-mid-line);background:var(--sz-mid-bg);color:var(--sz-mid-fg)}
+.sz.hi{border-color:var(--sz-hi-line);background:var(--sz-hi-bg);color:var(--sz-hi-fg)}
+.slot .sz{margin:6px 0 0;align-self:flex-start;white-space:normal}
+/* 両方選んだときの「選んだ組み合わせ」 */
+.pairsum{width:100%;text-align:left;margin-top:14px;background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow)}
+.ps-k{font-size:12.5px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.ps-row{display:flex;gap:12px;align-items:center}
+.ps-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ps-main b{font-size:18px}
+.ps-more{font-size:14px;font-weight:700;color:var(--accent)}
+/* × は隠さず、最後に小さく並べる */
+.ngsec{margin-top:26px}
+.list.compact .row{padding:10px 12px;gap:10px;min-height:var(--tap)}
+.list.compact .rname{font-size:15px}
+.list.compact .rreq{font-size:14px}
+.list.compact .why{font-size:14px;color:var(--ng-text)}
 
-.summary{display:flex;gap:8px;margin-top:12px}
-.sum{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);padding:8px 4px;font-weight:700}
-.sum .n{font-family:var(--font-num);font-size:18px}
-.sum.ok{background:var(--ok-soft);color:var(--ok)} .sum.warn{background:var(--warn-soft);color:var(--warn)} .sum.ng{background:var(--ng-soft);color:var(--ng)}
+/* 内径ゲージ：帯＝コイルが求める内径、縦線＝カテーテルの内径。上限が書かれていない先は破線 */
+.gauge{display:block;position:relative;margin:4px 0 2px}
+.g-track{display:block;position:relative;height:10px;border-radius:5px;background:var(--track);box-shadow:inset 0 0 0 1px var(--line)}
+.g-band{position:absolute;top:0;bottom:0;border-radius:5px;background:var(--band);min-width:4px}
+.g-band.g-open{border-radius:5px 0 0 5px}
+.g-pin{position:absolute;top:-3px;bottom:-3px;width:4px;margin-left:-2px;border-radius:2px;background:var(--band)}
+.g-unk{position:absolute;top:0;bottom:0;border:2px dashed var(--line-strong);border-left:0;border-radius:0 5px 5px 0}
+.g-none{position:absolute;inset:0;border-radius:5px;background:repeating-linear-gradient(135deg,var(--line-strong) 0 2px,transparent 2px 7px)}
+.g-mark{position:absolute;top:-6px;bottom:-6px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--mark);box-shadow:0 0 0 2px var(--surface)}
+.g-mark.out-r::after,.g-mark.out-l::after{content:"";position:absolute;top:50%;transform:translateY(-50%);border:6px solid transparent}
+.g-mark.out-r::after{left:-14px;border-left-color:var(--mark)}
+.g-mark.out-l::after{left:5px;border-right-color:var(--mark)}
+.gauge.big{margin:38px 0 4px}
+.gauge.big .g-track{height:16px;border-radius:8px}
+.gauge.big .g-mark{top:-10px;bottom:-10px;width:4px;margin-left:-2px}
+.g-val{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);font-size:14px;font-weight:600;white-space:nowrap;color:var(--fg)}
+.g-lab{position:absolute;bottom:calc(100% + 6px);font-size:12.5px;color:var(--fg);white-space:nowrap}
+.g-lab.r{right:0}
+.ticks{display:block;position:relative;height:22px;margin-top:8px;font-size:12.5px;color:var(--fg)}
+.ticks span{position:absolute;top:0;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--fg);margin-top:4px}
+.legend i{display:inline-block;width:16px;height:10px;border-radius:3px;background:var(--band);margin-right:6px;vertical-align:-1px}
+.legend i.m{width:4px;height:14px;background:var(--mark);vertical-align:-3px}
+.legend i.u{background:none;border:2px dashed var(--line-strong)}
+.legend i.n{background:repeating-linear-gradient(135deg,var(--line-strong) 0 2px,transparent 2px 5px)}
 
-.mk{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:17px;line-height:1}
-.mk.ok{background:var(--ok);color:var(--surface)} .mk.warn{background:var(--warn-fill);color:var(--warn-on);box-shadow:inset 0 0 0 1.5px var(--warn)} .mk.ng{background:var(--ng-soft);color:var(--ng);border:1px solid var(--line)}
-.mk.part{background:linear-gradient(135deg,var(--ok) 50%,var(--warn-fill) 50%);color:var(--surface)}
+.empty{margin-top:28px;text-align:center;font-size:15px;display:flex;flex-direction:column;gap:12px;align-items:center}
+footer{margin-top:32px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:8px}
+footer .lg{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--fg)}
+footer .lg span{display:inline-flex;align-items:center;gap:5px}
+footer button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:13px;align-self:flex-start;min-height:32px}
 
-.results{margin-top:14px;display:flex;flex-direction:column;gap:10px}
-.group{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.ghead{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-2);border-bottom:1px solid var(--line)}
-.ghead .gt{font-weight:700;min-width:0}
-.ghead .gs{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
-details.row{border-top:1px solid var(--line)}
-details.row:first-of-type{border-top:0}
-details.row>summary{list-style:none;display:flex;gap:10px;align-items:flex-start;padding:10px 12px;cursor:pointer}
-details.row>summary::-webkit-details-marker{display:none}
-.rb{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
-.rn{font-weight:700;font-size:14.5px}
-.rc{font-size:12.5px;color:var(--muted)}
-.why{font-size:12.5px}
-.why.warn{color:var(--warn)} .why.ng{color:var(--muted)}
-.badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
-.bd{font-size:11px;border-radius:4px;padding:1px 6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
-.bd.unv{color:var(--flag);border-color:var(--flag);background:var(--flag-soft)}
-.bd.mfr{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
-.bd.time{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
-.req{font-family:var(--font-num);font-size:12.5px;white-space:nowrap;color:var(--fg)}
-.detail{padding:0 12px 12px 52px;font-size:12.5px;color:var(--muted);display:grid;grid-template-columns:auto 1fr;gap:3px 10px}
-.detail dt{color:var(--muted)} .detail dd{margin:0;color:var(--fg);min-width:0;overflow-wrap:anywhere}
+/* シート（選ぶ・判定・ご利用にあたって） */
+.sheet{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet[hidden]{display:none}
+.scrim{position:absolute;inset:0;background:var(--scrim);animation:fade .18s ease-out}
+.panel{position:relative;background:var(--bg);border-radius:22px 22px 0 0;max-height:92%;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px);animation:up .22s cubic-bezier(.2,.8,.2,1);width:100%;max-width:560px;margin:0 auto;touch-action:pan-y}
+@keyframes up{from{transform:translateY(40%)}to{transform:none}}
+@keyframes fade{from{opacity:0}}
+.sh-top{touch-action:none}
+.grab{width:44px;height:5px;border-radius:3px;background:var(--line-strong);margin:8px auto 2px}
+.sh-head{display:flex;align-items:center;gap:8px;padding:4px 16px 10px}
+.sh-head h2{margin:0;font-size:18px;font-weight:700;flex:1;min-width:0;line-height:1.35}
+.sh-head h2:focus{outline:none}
+.sh-body{overflow-y:auto;padding:0 16px 24px;overscroll-behavior:contain;display:flex;flex-direction:column;gap:14px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px}
+.seg button{min-height:var(--tap);border:0;border-radius:9px;background:none;font-weight:700;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:0 12px;min-height:var(--tap)}
+.search:focus-within{border-color:var(--accent)}
+.search svg{flex:none;width:18px;height:18px;color:var(--muted)}
+.search input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:16px;padding:10px 0}
+.plist{display:flex;flex-direction:column;gap:16px}
+.pg h3{margin:0 4px 6px;font-size:13px;letter-spacing:.06em;color:var(--muted)}
+.pg .list{box-shadow:none;border:1px solid var(--line)}
+.pi{width:100%;border:0;background:none;text-align:left;display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);min-height:58px}
+.pi:first-child{border-top:0}
+.pi.on{background:var(--accent-soft)}
+.pi.wm{grid-template-columns:auto 1fr auto}
+.pi.wm .mk{grid-row:1 / span 2}
+.pi.wm .pm{grid-column:2}
+.pi.wm .pv{grid-column:3}
+.presets button{display:flex;align-items:center;justify-content:center;gap:6px}
+.pi .pn{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.pi .pm{grid-column:1;font-size:13px;color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.pi .pv{grid-column:2;grid-row:1 / span 2;font-size:15px;font-weight:600;text-align:right;white-space:nowrap}
+.none{text-align:center;font-size:15px;padding:18px 0}
+.manual{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.manual label{font-size:14px;font-weight:700}
+.mrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mrow input{width:7.5em;min-height:var(--tap);border:2px solid var(--line);border-radius:12px;background:var(--bg);padding:0 12px;font-family:var(--font-num);font-size:18px}
+.mrow input:focus{border-color:var(--accent);outline:none}
+.mrow span{font-size:14px}
+.mrow .btn{margin-left:auto}
+.conv{font-size:14px;min-height:1.5em;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.conv.err{color:var(--flag);font-weight:700}
+.conv button{border:1px solid var(--accent);background:var(--accent-soft);color:var(--fg);border-radius:10px;padding:0 12px;min-height:40px;font-weight:700;font-size:14px}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.presets button{min-height:56px;border-radius:12px;border:2px solid var(--line);background:var(--surface);font-family:var(--font-num);font-weight:600;font-size:17px}
+.presets button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.terms ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.7}
 
-details.fold{margin-top:4px}
-details.fold>summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8px 2px}
-details.fold .results{margin-top:6px}
-
-.empty{margin-top:24px;color:var(--muted);text-align:center;font-size:14px}
-.empty.err{color:var(--flag);font-weight:700}
-.notice a{color:var(--accent)}
-.terms{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
-.terms h2{font-size:13px;margin:0 0 6px;color:var(--fg)}
-.terms ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:5px;line-height:1.6}
-footer{margin-top:28px;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
-@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+/* 判定カード */
+.verdict{border-radius:20px;padding:18px 16px 16px;background:var(--surface);box-shadow:var(--shadow);border-top:5px solid var(--line-strong)}
+.verdict.ok{border-top-color:var(--ok)} .verdict.warn{border-top-color:var(--warn)} .verdict.ng{border-top-color:var(--ng)}
+.vhead{display:flex;gap:14px;align-items:center}
+.vword{font-weight:700;font-size:22px;line-height:1.3;color:var(--fg)}
+.vwhy{font-size:15px;margin-top:2px}
+.verdict.warn .vwhy{color:var(--warn-text)}
+.vnote{margin-top:12px;font-size:13.5px;background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.vnums{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.vnums div{background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.vnums .k{font-size:12.5px;font-weight:700;color:var(--muted)}
+.vnums b{font-size:17px;font-weight:600;overflow-wrap:anywhere}
+.vnums small{font-size:13px}
+.verdict .tags{margin-top:12px}
+.vpair{font-size:14px;margin-bottom:8px}
+.spec{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.spec summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;min-height:var(--tap);font-weight:700}
+.spec summary::-webkit-details-marker{display:none}
+.spec summary .k{font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.spec summary::after{content:"＋";margin-left:auto;color:var(--muted)}
+.spec[open] summary::after{content:"－"}
+.spec dl{margin:0;padding:0 14px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.spec dt{color:var(--muted)} .spec dd{margin:0;min-width:0;overflow-wrap:anywhere}
+/* ★マイ在庫 */
+.pw{display:flex;border-top:1px solid var(--line)}
+.pw:first-child{border-top:0}
+.pw .pi{flex:1;min-width:0;border-top:0}
+/* ★の列がある分、内径は名前の下の行に（横に並べると名前とサイズの札が押しつぶされる） */
+.pw .pi{grid-template-columns:1fr}
+.pw .pi .pn,.pw .pi .pv,.pw .pi .pm{grid-column:1;grid-row:auto;text-align:left}
+.pw .pi.wm{grid-template-columns:auto 1fr}
+.pw .pi.wm .mk{grid-column:1;grid-row:1 / span 3}
+.pw .pi.wm .pn,.pw .pi.wm .pv,.pw .pi.wm .pm{grid-column:2}
+.star{flex:none;width:52px;border:0;border-left:1px solid var(--line);background:none;font-size:22px;color:var(--muted);font-family:var(--font-ui)}
+.star[aria-pressed="true"]{color:var(--accent)}
+.tag.stk{background:var(--surface-2);color:var(--fg);border:1px solid var(--line-strong)}
+.stockbar{margin:10px 2px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+.stockbar.on{background:var(--accent-soft);border-radius:12px;padding:8px 10px;font-weight:700}
+.stockbar.on span{flex:1 1 12em}
+/* 判定シートの下の操作（★・共有） */
+.vacts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.vacts .k{width:100%;font-size:12.5px;font-weight:700;color:var(--muted)}
+.btn.stk{font-weight:700;text-align:left}
+.btn.stk[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.share-msg{font-size:14px;font-weight:700;flex:1 1 100%}
+.share-url{width:100%;min-height:var(--tap);border:2px solid var(--line);border-radius:12px;background:var(--surface);padding:0 10px;font-size:14px}
+.terms p{margin:0 0 12px;font-size:15px;line-height:1.7}
+/* 更新の知らせ（公開版の Service Worker が新しいデータを受け取ったとき） */
+.upd{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:40;width:calc(100% - 24px);max-width:536px;display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:8px 8px 8px 16px;box-shadow:var(--shadow);font-weight:700;font-size:15px}
+.upd[hidden]{display:none}
+.upd span{flex:1}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
 
-<div class="wrap">
-  <header class="top">
-    <div class="brand"><h1>コイル適合チェッカー</h1><span class="stamp">データ <span class="num" id="built"></span></span></div>
-    <div class="tabs" role="tablist">
-      <button class="tab" role="tab" id="tab-cat" aria-selected="true">カテーテルから</button>
-      <button class="tab" role="tab" id="tab-coil" aria-selected="false">コイルから</button>
+<div class="app">
+  <header class="bar" id="bar">
+    <div class="bar-row">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 12c0-3 2-5 4-5s3 2 3 5-1 5-3 5-4-2-4-5zm7 0c0-3 2-5 4-5s3 2 3 5-1 5-3 5"/><path d="M18 12c0-3 1-5 2-5"/></svg></span>
+      <span class="brand"><b>コイル適合チェッカー</b><small>添付文書と照合 <span class="num" id="checked"></span></small></span>
+      <button class="hbtn" id="theme" aria-label="表示の明るさを切り替える"></button>
+      <button class="hbtn" data-terms aria-label="ご利用にあたって">説明</button>
     </div>
+    <div class="mini" id="mini" hidden></div>
   </header>
+  <p class="caution">内径の数値だけで照らし合わせた参考情報です。使う前に最新の添付文書を確認してください。<button data-terms>ご利用にあたって</button></p>
 
-  <p class="notice"><b>参考情報です。</b>内径の数値だけを照らし合わせた結果で、組み合わせの安全性を保証するものではありません。使用前に必ず最新の添付文書を確認してください。<a href="#terms">ご利用にあたって</a></p>
-
-  <div id="view"></div>
+  <section class="pair" id="pair" aria-label="選んでいるもの"></section>
+  <main id="out"></main>
 
   <footer>
-    <span>○ 添付文書の範囲内　△ 要確認（上限の記載なし・基準なしなど。理由を表示）　× 範囲外</span>
-    <span>出典は各行をタップすると表示されます。内径の単位は inch（″）。</span>
-    <section class="terms" id="terms">
-      <h2>ご利用にあたって</h2>
-      <ol>
-        <li>このツールは、国内の添付文書・メーカーのカタログなど公開されている資料から、カテーテルの内径とコイルが求める内径を照らし合わせて表示する参考情報です。医療機器どうしの適合や安全性を保証するものではありません。</li>
-        <li>判定に使っているのは内径の数値だけです。カテーテルの柔らかさや屈曲、マーカーの数と位置、親カテーテルとの組み合わせ、離脱装置、ハイドロゲルコイルの留置までの時間などは考えていません。</li>
-        <li>○は「添付文書に書かれた内径の範囲に入る」という意味です。メーカーがその組み合わせで動作を確かめたことを意味しません。他社製カテーテルとの併用を推奨しないと書いている添付文書もあります。</li>
-        <li>△（要確認）は、添付文書に内径の上限や基準が書かれていないものです。使えるかどうかはわかりません。</li>
-        <li>データには誤りや、添付文書の改訂が反映されていない部分がありえます。画面上部の「データ」の日付を確かめ、使用前には必ず最新の添付文書・メーカーの情報を確認してください。</li>
-        <li>使うかどうか、どう使うかは、使用する医師が自分の判断と責任で決めてください。作成者は、このツールを使ったことで生じた結果について責任を負いません。</li>
-        <li>このツールは個人が作成したもので、各メーカーとは関係ありません。製品名は各社の商標です。</li>
-      </ol>
-    </section>
+    <span class="lg" id="legend"></span>
+    <span>ゲージの帯はコイルが求める内径、縦線はカテーテルの内径。破線は添付文書に上限が書かれていない部分です。単位は inch（″）。</span>
+    <span>添付文書と照合した日 <span class="num" id="checked2"></span>（いちばん古い製品の日付）・データ作成 <span class="num" id="built"></span></span>
+    <button data-terms>ご利用にあたって</button>
+    <button data-install id="install-foot" hidden>ホーム画面に追加する</button>
   </footer>
 </div>
+
+<div class="upd" id="upd" role="status" hidden><span>新しいデータがあります</span><button class="btn primary" id="upd-go">更新する</button></div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="scrim" data-close></div>
+  <div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sh-top" id="sh-top">
+      <div class="grab" aria-hidden="true"></div>
+      <div class="sh-head"><h2 id="sheet-title" tabindex="-1"></h2><button class="btn" data-close>閉じる</button></div>
+    </div>
+    <div class="sh-body" id="sheet-body"></div>
+  </div>
+</div>
+<div class="sr" id="live" aria-live="polite"></div>
 
 <script>
 const DATA = /*__DATA__*/null;
 const EPS = 1e-6;
 const PARENT_PRESETS = [0.035, 0.038, 0.041, 0.042, 0.047];
 const LIMITS = Object.fromEntries(DATA.limits.map(l => [String(l.platform), l.upper_id_in]));
-const SURF = {bare:"ベア", fiber:"ファイバー", hydrogel:"ハイドロゲル"};
-const SYM = {ok:"○", warn:"△", ng:"×"};
+const SURF = {hydrogel:"ハイドロゲル", fiber:"ファイバー", bare:"ベア"};
+const SURF_ORDER = ["hydrogel", "fiber", "bare"];
+const WORD = {ok:"範囲内", warn:"要確認", ng:"範囲外"};
+const WORD_LONG = {ok:"添付文書の範囲内", warn:"要確認", ng:"範囲外"};
 const RANK = {ok:0, warn:1, ng:2};
+const SCALE = {micro:[0.010, 0.030], parent:[0.033, 0.050]};
+const TICKS = {micro:[0.010, 0.015, 0.020, 0.025, 0.030], parent:[0.035, 0.040, 0.045, 0.050]};
+const ID_MIN = 0.005, ID_MAX = 0.1;
+const TERMS_VER = "2026-10-13";
+const STALE_MS = 12 * 3600e3;
+/* 公開用（PWA）のときだけ出すもの：共有リンク・ホーム画面への追加。Artifact では出さない */
+const SITE = !!document.querySelector('link[rel="manifest"]');
 const $ = s => document.querySelector(s);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const inch = v => v == null ? "—" : `${v.toFixed(4).replace(/0$/, "")}″`;  /* 0.040 を 0.04 にしない（小数3桁は残す） */
-const ID_MIN = 0.005, ID_MAX = 0.1;  /* 手入力で受け付ける内径（inch） */
-const idOk = v => v >= ID_MIN && v <= ID_MAX;
-const ID_ERR = `${ID_MIN.toFixed(3)}〜${ID_MAX.toFixed(3)} の範囲で、inch で入力してください（mm なら 25.4 で割る）`;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const inch = v => v == null ? "—" : `${v.toFixed(4).replace(/0$/, "")}″`;
+/* 一覧の右端で小数点の位置をそろえる（同じ幅の箱に左寄せ） */
+const inchA = v => `<span class="ia">${inch(v)}</span>`;
+const mm = v => v == null ? "" : `${(v * 25.4).toFixed(2)} mm`;
+const kata = s => s.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+const norm = s => kata(String(s ?? "").normalize("NFKC").toLowerCase()).replace(/[\s\-・/()（）ー]/g, "");
 
 function store(k, v){ try{ if(v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); }catch(e){ return null; } }
 
-/* 判定: coil × カテーテル内径（kind: micro / parent） */
+/* ---------- 判定（公開版と同じ） ---------- */
 function judge(coil, id, kind){
   const r = judgeCore(coil, id, kind);
   if(r.s === "warn" && coil.why_extra) r.why = r.why + "（" + coil.why_extra + "）";
@@ -183,170 +384,458 @@ function mfrListed(coil, cat){
   const toks = [cat.model, cat.model.replace(cat.series, "").trim()].filter(t => t.length >= 4);
   return toks.some(t => coil.mfr_listed_catheters.includes(t));
 }
-function badges(o, extra=""){
-  let b = extra;
-  if(!o.verified) b += `<span class="bd unv">未照合</span>`;
-  return b ? `<div class="badges">${b}</div>` : "";
+
+/* ---------- 印：○＝円、△＝三角、×＝四角。色がわからなくても外形で見分ける ---------- */
+function mk(s, px = 30, soft = false){
+  const a = `class="mk" width="${px}" height="${px}" viewBox="0 0 30 30" role="img" aria-label="${WORD[s]}"`;
+  if(s === "ok") return `<svg ${a}><circle cx="15" cy="15" r="13" style="fill:var(${soft ? "--ok-soft" : "--ok"});stroke:var(--ok);stroke-width:${soft ? 2.5 : 0}"/><circle cx="15" cy="15" r="6.5" style="fill:none;stroke:var(${soft ? "--ok-text" : "--ok-on"});stroke-width:2.6"/></svg>`;
+  if(s === "warn") return `<svg ${a}><path d="M15 2.5 28.5 26.5H1.5Z" style="fill:var(${soft ? "--warn-soft" : "--warn"});stroke:var(--warn-text);stroke-width:${soft ? 2.5 : 1.5};stroke-linejoin:round"/><path d="M15 11.5 21 22H9Z" style="fill:none;stroke:var(${soft ? "--warn-text" : "--warn-on"});stroke-width:2.2;stroke-linejoin:round"/></svg>`;
+  return `<svg ${a}><rect x="3" y="3" width="24" height="24" rx="5" style="fill:var(--ng-soft);stroke:var(--ng);stroke-width:1.5"/><path d="M10.5 10.5l9 9m0-9-9 9" style="fill:none;stroke:var(--ng-text);stroke-width:2.4;stroke-linecap:round"/></svg>`;
 }
-function srcRows(o){
-  return `<dt>販売名</dt><dd>${esc(o.jp_trade_name)||"—"}</dd>
-    <dt>承認番号</dt><dd class="num">${esc(o.approval_no)||"—"}</dd>
-    <dt>出典</dt><dd>${esc({ifu_jp:"国内添付文書", catalog_jp:"国内カタログ", foreign:"海外資料"}[o.source_type]||o.source_type)}</dd>
-    <dt>添付文書の版</dt><dd>${esc(o.source_date)||"—"}</dd>
-    ${o.note ? `<dt>補足</dt><dd>${esc(o.note)}</dd>` : ""}`;
+
+/* ---------- 状態 ---------- */
+const saved = store("cc3") || {};
+const st = {
+  anchor: saved.anchor !== undefined ? saved.anchor : {side:"cat", key:{t:"micro", id:DATA.catheters[0].cat_id}},
+  partner: saved.partner || null,  /* 一覧の基準と反対側で選んだもの（基準がカテーテルならコイルのID、コイルならカテーテルのキー） */
+  ack: saved.ack || "", t: saved.t || Date.now(), rec: saved.rec || {cat:[], coil:[]}, theme: saved.theme || "",
+  stock: saved.stock || {cat:[], coil:[]},  /* ★マイ在庫（カテーテルの cat_id／コイルの coil_id） */
+  inst: saved.inst || 0,                    /* ホーム画面への追加の案内を閉じたか */
+  onlyStock: false                          /* 一覧を★だけにする。保存しない（応援先で隠れたままにならないように） */
+};
+let staleMs = saved.anchor && Date.now() - (saved.t || 0) > STALE_MS ? Date.now() - saved.t : 0;
+if(staleMs) st.partner = null;  /* 時間がたっていたら、前回の組み合わせは出さない */
+const save = () => store("cc3", {anchor:st.anchor, partner:st.partner, ack:st.ack, t:st.t, rec:st.rec, theme:st.theme, stock:st.stock, inst:st.inst});
+const coilById = id => DATA.coils.find(c => c.coil_id === id);
+const catById = id => DATA.catheters.find(c => c.cat_id === id);
+const inStock = (side, id) => st.stock[side].includes(id);
+function toggleStock(side, id){ const l = st.stock[side]; st.stock[side] = l.includes(id) ? l.filter(x => x !== id) : [...l, id]; save(); }
+
+/* ---------- 共有リンク：#a=cat&c=micro:TMP-CN-HF&o=AZ-CX18 ---------- */
+const catKeyStr = k => k.t === "micro" ? `micro:${k.id}` : `${k.t}:${k.v}`;
+function catKeyParse(s){
+  const i = (s || "").indexOf(":"); if(i < 0) return null;
+  const t = s.slice(0, i), x = s.slice(i + 1);
+  if(t === "micro") return catById(x) ? {t, id:x} : null;
+  if(t === "parent" || t === "manual"){ const v = +x; return v >= ID_MIN && v <= ID_MAX ? {t, v} : null; }
+  return null;
 }
-function seriesMark(list){
-  const st = new Set(list.map(x => x.r.s));
-  if(st.size === 1) return [...st][0];
-  return st.has("ok") ? "part" : "warn";
+function shareUrl(){
+  const a = st.anchor; if(!a) return "";
+  const p = new URLSearchParams({a:a.side});
+  if(a.side === "cat"){ p.set("c", catKeyStr(a.key)); if(st.partner) p.set("o", st.partner); }
+  else{ p.set("o", a.id); if(st.partner) p.set("c", catKeyStr(st.partner)); }
+  return location.href.split("#")[0] + "#" + p.toString();
 }
-function seriesNote(list){
-  const n = {ok:0, warn:0, ng:0}; list.forEach(x => n[x.r.s]++);
-  return Object.entries(n).filter(([,v]) => v).map(([k,v]) => `${SYM[k]}${v}`).join(" ");
+let openShared = false;
+(() => {
+  if(!location.hash.includes("=")) return;
+  const p = new URLSearchParams(location.hash.slice(1)), c = catKeyParse(p.get("c")), o = coilById(p.get("o")) ? p.get("o") : null;
+  if(p.get("a") === "coil" && o){ st.anchor = {side:"coil", id:o}; st.partner = c; }
+  else if(c){ st.anchor = {side:"cat", key:c}; st.partner = o; }
+  else return;
+  st.t = Date.now(); staleMs = 0; openShared = !!(st.anchor && st.partner); save();
+  try{ history.replaceState(null, "", location.href.split("#")[0]); }catch(e){}
+})();
+function setAnchor(a){ st.anchor = a; if(!a) st.partner = null; st.t = Date.now(); staleMs = 0; save(); }
+function setPartner(p){ st.partner = p; st.t = Date.now(); staleMs = 0; save(); }
+function current(){
+  const a = st.anchor; let c = null, o = null;
+  if(a?.side === "cat"){ c = resolveCat(a.key); o = st.partner ? coilById(st.partner) : null; }
+  else if(a?.side === "coil"){ o = coilById(a.id); c = st.partner ? resolveCat(st.partner) : null; }
+  return {c, o};
 }
-function summaryBar(items){
+
+function resolveCat(k){
+  if(!k) return null;
+  if(k.t === "micro"){ const o = catById(k.id); return o && {key:k, kind:"micro", idv:o.id_distal_in, name:o.model, sub:`${o.manufacturer} · ${o.od_distal_fr ?? "—"}Fr`, obj:o}; }
+  if(k.t === "manual") return {key:k, kind:"micro", idv:k.v, name:"入力した内径", sub:"マイクロカテーテル（先端内径）", obj:null};
+  if(k.t === "parent") return {key:k, kind:"parent", idv:k.v, name:"親カテーテル", sub:"内径で判定", obj:null};
+  return null;
+}
+function remember(side, key){
+  const k = JSON.stringify(key);
+  st.rec[side] = [k, ...st.rec[side].filter(x => x !== k)].slice(0, 4); save();
+}
+function agoText(ms){ const h = Math.round(ms / 3600e3); return h < 48 ? `${h}時間前` : `${Math.round(h / 24)}日前`; }
+
+/* ---------- 内径ゲージ ---------- */
+function gauge(o, idv, kind, big){
+  const [a, b] = SCALE[kind];
+  const raw = v => (v - a) / (b - a) * 100, pct = v => Math.max(0, Math.min(100, raw(v)));
+  const lo = o.id_min_in, hi = o.id_max_in, rule = o.id_rule, u = LIMITS[o.platform];
+  let h = "";
+  let lg = "";
+  if(rule === "none"){ h = `<span class="g-none"></span>`; lg = "none"; }
+  else if(rule === "range") h = `<span class="g-band" style="left:${pct(lo)}%;width:${Math.max(0, pct(hi) - pct(lo))}%"></span>`;
+  else if(rule === "min_nomax"){ h = `<span class="g-band g-open" style="left:${pct(lo)}%;right:0"></span>`; lg = "open"; }
+  else if(u != null) h = `<span class="g-band" style="left:${pct(lo)}%;width:${Math.max(0, pct(u) - pct(lo))}%"></span>`;
+  else { lg = "unk"; h = `<span class="g-unk" style="left:${pct(lo)}%;right:0"></span><span class="g-pin" style="left:${pct(lo)}%"></span>`; }
+  if(idv != null){
+    const r = raw(idv), side = r < 0 ? " out-l" : r > 100 ? " out-r" : "";
+    h += `<span class="g-mark${side}" style="left:${pct(idv)}%">${big ? `<span class="g-val num">${inch(idv)}</span>` : ""}</span>`;
+  }
+  const ticks = big ? `<span class="ticks num">${TICKS[kind].map(t => { const p = pct(t), tx = p < 4 ? "0" : p > 96 ? "-100%" : "-50%"; return `<span style="left:${p}%;transform:translateX(${tx})">${t.toFixed(3)}</span>`; }).join("")}</span>` : "";
+  return {html:`<span class="gauge${big ? " big" : ""}" aria-hidden="true"><span class="g-track">${h}</span>${ticks}</span>`, lg};
+}
+
+/* ---------- 画面 ---------- */
+function slot(side, label, filled, v, n, extra){
+  return `<div class="slot${filled ? " on" : ""}">
+    <button class="slot-main" data-open="${side}" aria-label="${esc(label)}：${esc(filled ? v + "。変える" : v)}">
+      <span class="slot-k">${label}</span><span class="slot-v">${esc(v)}</span>${n ? `<span class="slot-n num">${n}</span>` : ""}${extra || ""}
+    </button>${filled ? `<button class="slot-clear" data-clear="${side}" aria-label="${label}を外す"><span>外す</span></button>` : ""}</div>`;
+}
+function renderPair(c, o){
+  const stale = staleMs ? `<span class="stale">前回の選択（${agoText(staleMs)}）</span>` : "";
+  const side = st.anchor?.side;
+  $("#pair").innerHTML =
+    slot("cat", "カテーテル", !!c, c ? c.name : (o ? "一覧から選ぶ・入力" : "タップしてえらぶ"), c ? `${inch(c.idv)}<small>${c.kind === "parent" ? "内径" : "先端"}</small>` : "", side === "cat" ? stale : "") +
+    `<span class="plus" aria-hidden="true">＋</span>` +
+    slot("coil", "コイル", !!o, o ? o.group : (c ? "一覧から選ぶ" : "タップしてえらぶ"), o ? reqText(o) : "", (o ? sizeChip(o) : "") + (side === "coil" ? stale : ""));
+}
+function pairSum(c, o){
+  const r = judge(o, c.idv, c.kind);
+  const g = o.delivery_via === c.kind ? gauge(o, c.idv, c.kind, false).html : "";
+  return `<button class="pairsum" data-show-pair><span class="ps-k">選んだ組み合わせ</span>
+    <span class="ps-row">${mk(r.s, 40)}<span class="ps-main"><b>${WORD_LONG[r.s]}</b>${r.why ? `<span class="why ${r.s}">${esc(r.why)}</span>` : ""}</span><span class="chev" aria-hidden="true">›</span></span>
+    ${g}<span class="ps-more">くわしく見る（数値・注意点・出典）</span></button>`;
+}
+function intro(){
+  if(st.ack === TERMS_VER) return installCard();
+  return `<aside class="intro"><b>はじめに</b>
+    <p>カテーテルの内径と、コイルの添付文書が求める内径を照らし合わせるだけの参考ツールです。○は「数値が範囲に入る」という意味で、組み合わせの安全を保証しません。</p>
+    <div class="acts"><button class="btn primary" data-ack>わかりました</button><button class="btn" data-terms>ご利用にあたって</button></div></aside>`;
+}
+
+/* ---------- ホーム画面への追加の案内（「はじめに」の後に1回だけ。あとはフッターから） ---------- */
+let bip = null;  /* Android の Chrome などが出す「インストールできます」の合図 */
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); bip = e; render(); });
+addEventListener("appinstalled", () => { bip = null; st.inst = 1; save(); render(); });
+const STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const canInstall = () => SITE && !STANDALONE;
+function installHow(){
+  if(bip) return `<div class="acts"><button class="btn primary" data-install-go>ホーム画面に追加する</button></div>`;
+  return `<p>${IOS ? "Safari の共有ボタン（四角から上向きの矢印）→「ホーム画面に追加」" : "ブラウザのメニュー（右上の︙）→「ホーム画面に追加」または「アプリをインストール」"}</p>`;
+}
+function installCard(){
+  if(!canInstall() || st.inst) return "";
+  return `<aside class="intro"><b>ホーム画面に追加できます</b>
+    <p>アプリのように開けて、電波のない場所でも使えます（一度開いたあと）。</p>${installHow()}
+    <div class="acts"><button class="btn" data-install-later>あとで</button></div><p class="fine">画面のいちばん下の「ホーム画面に追加する」からも追加できます。</p></aside>`;
+}
+function tally(items){
   const n = {ok:0, warn:0, ng:0}; items.forEach(x => n[x.r.s]++);
-  return `<div class="summary">${["ok","warn","ng"].map(k => `<div class="sum ${k}">${SYM[k]} <span class="n">${n[k]}</span></div>`).join("")}</div>`;
+  return `<p class="tally"><span>${mk("ok", 22)}範囲内 <b class="num">${n.ok}</b></span><span>${mk("warn", 22)}要確認 <b class="num">${n.warn}</b></span><span>${mk("ng", 22)}範囲外 <b class="num">${n.ng}</b>${n.ng ? `<button data-jump="ng">いちばん下</button>` : ""}</span></p>`;
 }
-function groupBySeries(items, key){
+/* ★マイ在庫だけにする切り替え。★が1つもなければ出さない。絞っている間は、隠している数を必ず出す */
+function stockFilter(items, side, idOf){
+  const has = items.filter(x => idOf(x) && inStock(side, idOf(x)));
+  if(!st.stock[side].length || !items.some(x => idOf(x))) return {items, bar:""};
+  if(!st.onlyStock) return {items, bar:`<p class="stockbar"><button class="btn" data-only-stock="1" aria-pressed="false">★ マイ在庫だけ表示</button></p>`};
+  return {items:has, bar:`<p class="stockbar on"><span>★ マイ在庫だけ表示中。ほかの <b class="num">${items.length - has.length}</b> 件を隠しています</span><button class="btn primary" data-only-stock="0">全部表示</button></p>`};
+}
+const stockTag = on => on ? `<span class="tag stk">★ マイ在庫</span>` : "";
+function groups(items, key, order, rowFn){
   const m = new Map();
-  items.forEach(x => { const k = key(x.o); if(!m.has(k)) m.set(k, []); m.get(k).push(x); });
-  return [...m.entries()];
+  items.forEach(x => { const k = key(x); if(!m.has(k)) m.set(k, []); m.get(k).push(x); });
+  const gs = [...m.entries()].map(([k, list]) => ({k, list:list.sort((a, b) => RANK[a.r.s] - RANK[b.r.s]), best:Math.min(...list.map(x => RANK[x.r.s]))}));
+  gs.sort(order ? (a, b) => order.indexOf(a.k) - order.indexOf(b.k) : (a, b) => a.best - b.best);
+  return gs.map(g => `<section class="group"><h3 class="gh">${esc(g.k)}<span class="gc">${g.list.length}</span></h3><div class="list">${g.list.map(rowFn).join("")}</div></section>`).join("");
 }
-function renderGroups(items, key, rowHtml){
-  const groups = groupBySeries(items, key).map(([k, list]) => {
-    list.sort((a,b) => RANK[a.r.s] - RANK[b.r.s]);
-    return {k, list, best: Math.min(...list.map(x => RANK[x.r.s]))};
-  }).sort((a,b) => a.best - b.best);
-  return groups.map(g => `<div class="group">
-      <div class="ghead"><span class="mk ${seriesMark(g.list)}">${seriesMark(g.list)==="part"?"":SYM[seriesMark(g.list)]}</span>
-        <span class="gt">${esc(g.k)}</span><span class="gs">${seriesNote(g.list)}</span></div>
-      ${g.list.map(rowHtml).join("")}</div>`).join("");
+function ngBlock(dead, rowFn){
+  return dead.length ? `<section class="ngsec" id="ng"><h3 class="gh">${mk("ng", 18)}範囲外<span class="gc">${dead.length}</span></h3><div class="list compact">${dead.map(rowFn).join("")}</div></section>` : "";
 }
-function splitView(items, key, rowHtml){
+function row(attr, s, name, req, sub, g, why, tags, sel, chip){
+  return `<button class="row${sel ? " sel" : ""}" ${attr}${sel ? ` aria-current="true"` : ""}>${mk(s)}<span class="rmain">
+    <span class="rtop"><span class="rname">${esc(name)}${chip || ""}</span><span class="rreq num">${req}</span></span>
+    ${sub ? `<span class="rsub">${esc(sub)}</span>` : ""}${g || ""}${why ? `<span class="why ${s}">${esc(why)}</span>` : ""}${tags || sel ? `<span class="tags">${tags || ""}${sel ? `<span class="tag mfr">選んでいるもの</span>` : ""}</span>` : ""}</span>
+    <span class="chev" aria-hidden="true">›</span></button>`;
+}
+function sizeParts(o){
+  const z = o.size_condition; if(!z || z === "全サイズ") return null;
+  const i = z.indexOf("（");  /* 長い説明（品番の一覧など）は札に入れず、下の行に出す */
+  return i > 0 ? {chip:z.slice(0, i).trim(), rest:z.slice(i)} : {chip:z, rest:""};
+}
+/* 札の濃さ：同じ名前（group）の兄弟品だけ、小さい径から 薄→(中)→濃。意味は「同じ名前の中の順番」だけ（design/color_review.md）。
+   全データから決める（絞り込みで変わらない）。最初の数字が小さい順。読めない・同じときは CSV の順 */
+const SZ_LV = (() => {
+  const first = o => parseFloat((o.size_condition.match(/\d+(?:\.\d+)?/) || [NaN])[0]);
+  const m = new Map(), lv = {};
+  DATA.coils.filter(sizeParts).forEach(o => { if(!m.has(o.group)) m.set(o.group, []); m.get(o.group).push(o); });
+  m.forEach(list => {
+    list.sort((a, b) => (first(a) - first(b)) || 0);
+    const n = list.length;
+    list.forEach((o, i) => { lv[o.coil_id] = n < 2 || i === 0 ? "" : i === n - 1 ? " hi" : " mid"; });
+  });
+  return lv;
+})();
+/* 札の中は数字だけ太字（兄弟品どうしで違う部分に目が行くように） */
+const sizeChip = o => { const z = sizeParts(o); return z ? `<span class="sz${SZ_LV[o.coil_id] || ""}">${esc(z.chip).replace(/[0-9][0-9.]*(?:〜[0-9.]+)?(?:mm|″)?(?:以上)?/g, m => `<b>${m}</b>`)}</span>` : ""; };
+function coilTags(o, cat){
+  return (o.reposition_limit_min ? `<span class="tag time">${o.reposition_limit_min}分以内に離脱</span>` : "") +
+    (mfrListed(o, cat) ? `<span class="tag mfr">メーカー記載あり</span>` : "") + (o.verified ? "" : `<span class="tag unv">未照合</span>`);
+}
+function viewCoils(c, sel){
+  const f = stockFilter(DATA.coils.map(o => ({o, r:judge(o, c.idv, c.kind)})), "coil", x => x.o.coil_id), items = f.items;
   const live = items.filter(x => x.r.s !== "ng"), dead = items.filter(x => x.r.s === "ng");
-  let h = summaryBar(items);
-  h += live.length ? `<div class="results">${renderGroups(live, key, rowHtml)}</div>` : `<p class="empty">○・△ の組み合わせはありません</p>`;
-  if(dead.length) h += `<details class="fold"><summary>使えないもの（×）${dead.length} 件を表示</summary><div class="results">${renderGroups(dead, key, rowHtml)}</div></details>`;
+  const sz = o => sizeParts(o)?.rest || "";
+  const attr = o => `data-pair-coil="${esc(o.coil_id)}"`;
+  const isSel = o => sel && o.coil_id === sel.coil_id;
+  return intro() + (sel ? pairSum(c, sel) : "") + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(c.name)}に通せるコイル<small>${c.kind === "parent" ? "内径" : "先端内径"} <span class="num">${inch(c.idv)}</span> で判定</small></h2>` + tally(items) + f.bar +
+    (live.length ? groups(live, x => SURF[x.o.surface] || x.o.surface, SURF_ORDER.map(s => SURF[s]),
+      ({o, r}) => row(attr(o), r.s, o.group, reqText(o), sz(o), gauge(o, c.idv, c.kind, false).html, r.why, stockTag(inStock("coil", o.coil_id)) + coilTags(o, c.obj), isSel(o), sizeChip(o))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
+    ngBlock(dead, ({o, r}) => row(attr(o), "ng", o.group, reqText(o), "", "", r.why, "", isSel(o), sizeChip(o)));
+}
+function viewCats(o, sel){
+  const kind = o.delivery_via;
+  const all = kind === "parent"
+    ? PARENT_PRESETS.map(v => ({o:{key:{t:"parent", v}, model:`内径 ${inch(v)}`, series:"親カテーテル（内径）", idv:v, sub:mm(v)}, r:judge(o, v, "parent")}))
+    : DATA.catheters.map(c => ({o:{key:{t:"micro", id:c.cat_id}, model:c.model, series:c.series, idv:c.id_distal_in, sub:`${c.manufacturer} · ${c.od_distal_fr ?? "—"}Fr · ${(c.lengths_cm || "").replaceAll(";", "/")}cm`, obj:c}, r:judge(o, c.id_distal_in, "micro")}));
+  const f = stockFilter(all, "cat", x => x.o.obj?.cat_id), items = f.items;
+  const live = items.filter(x => x.r.s !== "ng"), dead = items.filter(x => x.r.s === "ng");
+  const attr = c => `data-pair-cat='${esc(JSON.stringify(c.key))}'`;
+  const tags = c => stockTag(c.obj && inStock("cat", c.obj.cat_id)) + (c.obj && mfrListed(o, c.obj) ? `<span class="tag mfr">メーカー記載あり</span>` : "");
+  const selKey = sel ? JSON.stringify(sel.key) : "", isSel = c => !!selKey && JSON.stringify(c.key) === selKey;
+  return intro() + (sel ? pairSum(sel, o) : "") + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(o.group)}を通せる${kind === "parent" ? "親カテーテル" : "マイクロカテーテル"}<small>コイルが求める内径 <span class="num">${reqText(o)}</span>${kind === "parent" ? "（親カテーテルで送るコイル）" : ""}</small></h2>` + tally(items) + f.bar +
+    (live.length ? groups(live, x => x.o.series, null, ({o:c, r}) => row(attr(c), r.s, c.model, inchA(c.idv), c.sub, gauge(o, c.idv, kind, false).html, r.why, tags(c), isSel(c))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
+    ngBlock(dead, ({o:c, r}) => row(attr(c), "ng", c.model, inchA(c.idv), "", "", r.why, "", isSel(c)));
+}
+function render(){
+  const a = st.anchor, {c, o} = current();
+  renderPair(c, o);
+  $("#out").innerHTML = a?.side === "cat" && c ? viewCoils(c, o) : a?.side === "coil" && o ? viewCats(o, c)
+    : intro() + `<div class="empty"><span>カテーテルかコイルのどちらかをえらぶと、組み合わせの一覧を出します</span><button class="btn primary" data-open="cat">カテーテルからえらぶ</button><button class="btn" data-open="coil">コイルからえらぶ</button></div>`;
+  $("#mini").innerHTML = c && o ? `<span>${esc(c.name)} ＋ ${esc(o.group)}</span>` : c ? `<span>${esc(c.name)}</span><span class="num">${inch(c.idv)}</span>` : o ? `<span>${esc(o.group)}</span><span class="num">${reqText(o)}</span>` : "";
+  $("#legend").innerHTML = ["ok", "warn", "ng"].map(s => `<span>${mk(s, 18)}${{ok:"添付文書の範囲内", warn:"要確認（上限の記載なしなど。理由を表示）", ng:"範囲外"}[s]}</span>`).join("");
+}
+
+/* ---------- 重ねるシート（戻るボタンで閉じる） ---------- */
+let ov = null, pushed = false, opener = null;
+function showOverlay(o){
+  const first = !ov; ov = o;
+  if(first){
+    opener = document.activeElement;
+    try{ history.pushState({cc:1}, ""); pushed = true; }catch(e){ pushed = false; }
+    $("#sheet").hidden = false; document.documentElement.classList.add("lock");
+  }
+  drawOverlay();
+  $("#sheet-title").focus({preventScroll:true});
+}
+function closeOverlay(){ if(!ov) return; if(pushed){ try{ history.back(); return; }catch(e){} } hideOverlay(); }
+function hideOverlay(){
+  ov = null; pushed = false; $("#sheet").hidden = true; document.documentElement.classList.remove("lock"); $("#panel").style.transform = "";
+  if(opener && document.contains(opener)) opener.focus({preventScroll:true});
+}
+addEventListener("popstate", () => { if(ov) hideOverlay(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape" && ov) closeOverlay(); });
+/* 上の取っ手を下へ引くと閉じる */
+(() => {
+  let y0 = null; const top = $("#sh-top"), panel = $("#panel");
+  top.addEventListener("pointerdown", e => { y0 = e.clientY; top.setPointerCapture(e.pointerId); });
+  top.addEventListener("pointermove", e => { if(y0 == null) return; const dy = Math.max(0, e.clientY - y0); panel.style.transform = `translateY(${dy}px)`; });
+  const end = e => { if(y0 == null) return; const dy = e.clientY - y0; y0 = null; if(dy > 90) closeOverlay(); else panel.style.transform = ""; };
+  top.addEventListener("pointerup", end); top.addEventListener("pointercancel", end);
+})();
+
+function drawOverlay(){
+  const b = $("#sheet-body"), t = $("#sheet-title");
+  if(ov.type === "terms"){
+    t.textContent = "ご利用にあたって";
+    b.innerHTML = `<div class="terms"><ol>${TERMS.map(x => `<li>${x}</li>`).join("")}</ol></div><button class="btn primary" data-ack data-close>わかりました</button>`;
+    return;
+  }
+  if(ov.type === "pair"){ t.textContent = "組み合わせの判定"; b.innerHTML = pairHtml(ov.c, ov.o); b.scrollTop = 0; return; }
+  if(ov.type === "install"){
+    t.textContent = "ホーム画面に追加";
+    b.innerHTML = `<div class="terms"><p>ホーム画面に追加すると、アプリのように開けて、電波のない場所でも使えます（一度開いたあと）。データが新しくなったときは、画面の下に「新しいデータがあります」と出ます。</p>${installHow()}</div>`;
+    return;
+  }
+  const other = st.anchor && st.anchor.side !== ov.side;
+  if(ov.side === "cat"){
+    t.textContent = other ? `カテーテルをえらぶ（${coilById(st.anchor.id)?.group}と組み合わせ）` : "カテーテルをえらぶ";
+    b.innerHTML = `<div class="seg" role="tablist"><button role="tab" data-seg="micro" aria-selected="${ov.seg === "micro"}">マイクロカテーテル</button><button role="tab" data-seg="parent" aria-selected="${ov.seg === "parent"}">親カテーテル</button></div>` +
+      (ov.seg === "micro"
+        ? searchBox("名前・内径で検索（かーねりあん、1018 など）") + `<div class="plist" id="plist"></div>` + manualBox("一覧にないときは先端内径を入力", "0.021")
+        : `<div class="presets">${PARENT_PRESETS.map(v => `<button data-parent="${v}" aria-pressed="${st.anchor?.side === "cat" && st.anchor.key.t === "parent" && Math.abs(st.anchor.key.v - v) < EPS}">${other ? mk(judge(coilById(st.anchor.id), v, "parent").s, 20) : ""}${inch(v)}</button>`).join("")}</div>` + manualBox("ほかの内径を入力", "0.040"));
+  }else{
+    t.textContent = other ? `コイルをえらぶ（${resolveCat(st.anchor.key)?.name}と組み合わせ）` : "コイルをえらぶ";
+    b.innerHTML = searchBox("名前で検索（あずーる、Target など）") + `<div class="plist" id="plist"></div>`;
+  }
+  const q = $("#q"); if(q) q.oninput = () => { ov.q = q.value; drawList(); };
+  const m = $("#mid"); if(m){ m.oninput = () => manualHint(m.value); $("#mid-go").onclick = () => useManual(m.value); m.onkeydown = e => { if(e.key === "Enter") useManual(m.value); }; }
+  if($("#plist")) drawList();
+}
+/* 共有：スマホの共有メニュー（LINE など）→ なければリンクをコピー → それも無理ならリンクを表示 */
+async function share(){
+  const url = shareUrl(), msg = $("#share-msg"), {c, o} = current(); if(!url) return;
+  const text = c && o ? `${c.name}（${inch(c.idv)}）＋ ${o.group}${sizeParts(o) ? " " + sizeParts(o).chip : ""}` : "";
+  try{ if(navigator.share){ await navigator.share({title:"コイル適合チェッカー", text, url}); return; } }catch(e){ if(e.name === "AbortError") return; }
+  try{ await navigator.clipboard.writeText(url); msg.textContent = "リンクをコピーしました"; return; }catch(e){}
+  msg.innerHTML = `<input class="share-url" readonly value="${esc(url)}" aria-label="共有リンク" onfocus="this.select()">`;
+}
+/* ★ボタン（行の右端。行そのものを押すと選ぶ、★を押すとマイ在庫に出し入れ） */
+const starBtn = (side, id, name) => `<button class="star" data-star="${side}" data-sid="${esc(id)}" aria-pressed="${inStock(side, id)}" aria-label="${esc(name)}をマイ在庫に入れる">${inStock(side, id) ? "★" : "☆"}</button>`;
+function searchBox(ph){
+  return `<label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="${ph}" autocomplete="off" enterkeyhint="search" aria-label="検索"></label>`;
+}
+function manualBox(label, ph){
+  return `<div class="manual"><label for="mid">${label}</label><div class="mrow"><input id="mid" inputmode="decimal" placeholder="${ph}" autocomplete="off"><span>inch</span><button class="btn primary" id="mid-go">この内径で見る</button></div><div class="conv" id="mid-conv" aria-live="polite"></div></div>`;
+}
+/* 検索の対象：名前・会社名・販売名・読み（CSV の search_alias。カタカナで書けばひらがなでも当たる）・内径の数字 */
+function hay(parts, nums){ return norm(parts.join(" ")) + " " + nums.filter(v => v != null).map(v => v.toFixed(4).replace(/0$/, "")).join(" "); }
+const CAT_HAY = Object.fromEntries(DATA.catheters.map(c => [c.cat_id, hay([c.model, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name, (c.search_alias || "").replaceAll(";", " ")], [c.id_distal_in])]));
+const COIL_HAY = Object.fromEntries(DATA.coils.map(c => [c.coil_id, hay([c.group, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name, c.size_condition, SURF[c.surface], (c.search_alias || "").replaceAll(";", " ")], [c.id_min_in, c.id_max_in])]));
+function drawList(){
+  const q = norm(ov.q || ""), el = $("#plist"), gs = [];
+  /* 片方を選んであるときは、相手の候補それぞれに○△×を出す（選ぶ前に結果が見える） */
+  const other = st.anchor && st.anchor.side !== ov.side;
+  const ao = other && ov.side === "cat" ? coilById(st.anchor.id) : null;
+  const ac = other && ov.side === "coil" ? resolveCat(st.anchor.key) : null;
+  if(ov.side === "cat"){
+    const on = c => st.anchor?.side === "cat" && st.anchor.key.t === "micro" && st.anchor.key.id === c.cat_id;
+    const item = c => `<div class="pw"><button class="pi${on(c) ? " on" : ""}${ao ? " wm" : ""}" data-pick-cat='${esc(JSON.stringify({t:"micro", id:c.cat_id}))}'>
+      ${ao ? mk(judge(ao, c.id_distal_in, "micro").s, 26) : ""}<span class="pn">${esc(c.model)}</span><span class="pv num">${inchA(c.id_distal_in)}</span><span class="pm">${esc(c.manufacturer)} · ${c.od_distal_fr ?? "—"}Fr</span></button>${starBtn("cat", c.cat_id, c.model)}</div>`;
+    if(!q){ const sk = st.stock.cat.map(catById).filter(Boolean); if(sk.length) gs.push(["★ マイ在庫", sk.map(item)]); }
+    if(!q){ const rec = st.rec.cat.map(k => JSON.parse(k)).filter(k => k.t === "micro").map(k => catById(k.id)).filter(Boolean); if(rec.length) gs.push(["最近えらんだもの", rec.map(item)]); }
+    const m = new Map(); DATA.catheters.filter(c => !q || CAT_HAY[c.cat_id].includes(q)).forEach(c => { if(!m.has(c.series)) m.set(c.series, []); m.get(c.series).push(item(c)); });
+    gs.push(...m.entries());
+  }else{
+    const item = c => `<div class="pw"><button class="pi${st.anchor?.side === "coil" && st.anchor.id === c.coil_id ? " on" : ""}${ac ? " wm" : ""}" data-pick-coil="${esc(c.coil_id)}">
+      ${ac ? mk(judge(c, ac.idv, ac.kind).s, 26) : ""}<span class="pn">${esc(c.group)}${sizeChip(c)}</span><span class="pv num">${reqText(c)}</span><span class="pm">${esc(c.manufacturer)}${sizeParts(c)?.rest ? " · " + esc(sizeParts(c).rest) : ""}</span></button>${starBtn("coil", c.coil_id, c.group + (sizeParts(c) ? " " + sizeParts(c).chip : ""))}</div>`;
+    const hits = DATA.coils.filter(c => !q || COIL_HAY[c.coil_id].includes(q));
+    if(!q){ const sk = st.stock.coil.map(coilById).filter(Boolean); if(sk.length) gs.push(["★ マイ在庫", sk.map(item)]); }
+    if(!q){ const rec = st.rec.coil.map(k => coilById(JSON.parse(k))).filter(Boolean); if(rec.length) gs.push(["最近えらんだもの", rec.map(item)]); }
+    SURF_ORDER.forEach(s => { const l = hits.filter(c => c.surface === s); if(l.length) gs.push([SURF[s], l.map(item)]); });
+  }
+  el.innerHTML = gs.length ? gs.map(([k, l]) => `<div class="pg"><h3>${esc(k)}</h3><div class="list">${l.join("")}</div></div>`).join("")
+    : `<p class="none">「${esc(ov.q)}」に当たるものがありません</p>`;
+}
+const parseIn = s => { const v = parseFloat(String(s).normalize("NFKC")); return isFinite(v) ? v : null; };
+const okId = v => v != null && v >= ID_MIN && v <= ID_MAX;
+function manualHint(s){
+  const el = $("#mid-conv"), v = parseIn(s); el.className = "conv";
+  if(v == null){ el.innerHTML = ""; return; }
+  if(okId(v)){ el.textContent = `＝ ${mm(v)}`; return; }
+  /* よくある打ち間違い：0.021 を 0.21、mm で入力 */
+  const opts = [];
+  if(v > 0.1 && v < 0.6){ const x = +(v / 10).toFixed(4); if(okId(x)) opts.push(`<button data-mid="${x}">${inch(x)} のまちがい？</button>`); }
+  if(v >= 0.25 && v <= 2.6){ const x = +(v / 25.4).toFixed(4); if(okId(x)) opts.push(`<button data-mid="${x}">${v} mm ＝ ${inch(x)}</button>`); }
+  el.className = "conv err";
+  el.innerHTML = `<span>${ID_MIN.toFixed(3)}〜${ID_MAX.toFixed(3)} の範囲で、inch で入力してください。</span>${opts.join("")}`;
+}
+function useManual(s){
+  const v = parseIn(s);
+  if(!okId(v)){ manualHint(s); return; }
+  pickCat(ov.seg === "parent" ? {t:"parent", v} : {t:"manual", v});
+}
+function pickCat(key){
+  remember("cat", key);
+  if(st.anchor && st.anchor.side === "coil"){ setPartner(key); render(); return openPair(resolveCat(key), coilById(st.anchor.id)); }
+  setAnchor({side:"cat", key}); closeOverlay(); render(); scrollTo({top:0}); $("#ctx")?.focus({preventScroll:true});
+}
+function pickCoil(id){
+  remember("coil", id);
+  if(st.anchor && st.anchor.side === "cat"){ setPartner(id); render(); return openPair(resolveCat(st.anchor.key), coilById(id)); }
+  setAnchor({side:"coil", id}); closeOverlay(); render(); scrollTo({top:0}); $("#ctx")?.focus({preventScroll:true});
+}
+function openPair(c, o){
+  if(!c || !o) return;
+  showOverlay({type:"pair", c, o});
+  const r = judge(o, c.idv, c.kind);
+  $("#live").textContent = `${c.name}と${o.group}：${WORD_LONG[r.s]}。${r.why}`;
+}
+function pairHtml(c, o){
+  const r = judge(o, c.idv, c.kind), same = o.delivery_via === c.kind;
+  const why = r.why || (r.s === "ok" ? "コイルの添付文書が示す内径の範囲に入っています" : "");
+  const g = same ? gauge(o, c.idv, c.kind, true) : null;
+  const tags = (o.reposition_limit_min ? `<span class="tag time">カテーテルに入れてから ${o.reposition_limit_min}分以内に離脱</span>` : "") +
+    (mfrListed(o, c.obj) ? `<span class="tag mfr">メーカーの記載にこのカテーテル名あり</span>` : "");
+  const src = x => `<dt>販売名</dt><dd>${esc(x.jp_trade_name) || "—"}</dd><dt>承認番号</dt><dd class="num">${esc(x.approval_no) || "—"}</dd>
+    <dt>出典</dt><dd>${esc({ifu_jp:"国内添付文書", catalog_jp:"国内カタログ", foreign:"海外資料"}[x.source_type] || x.source_type)}</dd><dt>添付文書の版</dt><dd>${esc(x.source_date) || "—"}</dd>${x.note ? `<dt>補足</dt><dd>${esc(x.note)}</dd>` : ""}`;
+  let h = `<article class="verdict ${r.s}">
+    <p class="vpair"><b>${esc(c.name)}</b>（${c.kind === "parent" ? "内径 " : ""}${inch(c.idv)}）＋ <b>${esc(o.group)}</b>${sizeChip(o)}</p>
+    <div class="vhead">${mk(r.s, 60, true)}<div><div class="vword">${WORD_LONG[r.s]}</div>${why ? `<div class="vwhy">${esc(why)}</div>` : ""}</div></div>
+    ${g ? g.html + `<div class="legend">${{none:`<span><i class="n"></i>添付文書に内径の基準なし</span>`, open:`<span><i></i>コイルが求める内径（上限なしと明記）</span>`, unk:`<span><i></i>添付文書の下限</span><span><i class="u"></i>上限の記載なし</span>`}[g.lg] || `<span><i></i>コイルが求める内径</span>`}<span><i class="m"></i>このカテーテル</span></div>` : ""}
+    <div class="vnums"><div><span class="k">カテーテル内径</span><b class="num">${inch(c.idv)}</b><small class="num">${mm(c.idv)}</small></div>
+      <div><span class="k">コイルが求める内径</span><b class="num">${reqText(o)}</b><small>${o.delivery_via === "parent" ? "親カテーテルで送る" : "マイクロカテーテルで送る"}</small></div></div>
+    ${tags ? `<div class="tags">${tags}</div>` : ""}
+    <p class="vnote">内径の数値だけを照らし合わせた結果です。組み合わせの安全や動作は保証しません。使う前に添付文書を確認してください。</p></article>`;
+  const sw = (side, id, name) => `<button class="btn stk" data-star="${side}" data-sid="${esc(id)}" aria-pressed="${inStock(side, id)}">${inStock(side, id) ? "★" : "☆"} ${esc(name)}</button>`;
+  h += `<div class="vacts"><span class="k">マイ在庫（★）</span>${sw("coil", o.coil_id, o.group + (sizeParts(o) ? " " + sizeParts(o).chip : ""))}${c.obj ? sw("cat", c.obj.cat_id, c.obj.model) : ""}</div>`;
+  if(SITE) h += `<div class="vacts"><button class="btn" data-share>この組み合わせを送る（リンク）</button><span class="share-msg" id="share-msg" aria-live="polite"></span></div>`;
+  h += `<details class="spec"><summary><span class="k">コイル</span>${esc(o.group)}${sizeChip(o)}</summary><dl>
+    <dt>適合内径</dt><dd class="num">${reqText(o)}</dd>${o.size_condition && o.size_condition !== "全サイズ" ? `<dt>対象</dt><dd>${esc(o.size_condition)}</dd>` : ""}
+    <dt>表面</dt><dd>${esc(SURF[o.surface] || o.surface)}</dd><dt>離脱</dt><dd>${esc(o.detach_device) || "—"}</dd>
+    ${o.mfr_listed_catheters ? `<dt>メーカー記載</dt><dd>${esc(o.mfr_listed_catheters)}</dd>` : ""}${src(o)}</dl></details>`;
+  if(c.obj){ const k = c.obj; h += `<details class="spec"><summary><span class="k">カテーテル</span>${esc(k.model)}</summary><dl>
+    <dt>先端/手元内径</dt><dd class="num">${inch(k.id_distal_in)} / ${inch(k.id_proximal_in)}</dd><dt>外径</dt><dd class="num">${k.od_distal_fr ?? "—"} / ${k.od_proximal_fr ?? "—"} Fr</dd>
+    <dt>有効長</dt><dd class="num">${esc((k.lengths_cm || "—").replaceAll(";", " / "))} cm</dd>${k.min_guide_id_in ? `<dt>通せる親</dt><dd class="num">内径 ${inch(k.min_guide_id_in)} 以上</dd>` : ""}${src(k)}</dl></details>`; }
   return h;
 }
+const TERMS = [
+  "このツールは、国内の添付文書・メーカーのカタログなど公開されている資料から、カテーテルの内径とコイルが求める内径を照らし合わせて表示する参考情報です。医療機器どうしの適合や安全性を保証するものではありません。",
+  "判定に使っているのは内径の数値だけです。カテーテルの柔らかさや屈曲、マーカーの数と位置、親カテーテルとの組み合わせ、離脱装置、ハイドロゲルコイルの留置までの時間などは考えていません。",
+  "○は「添付文書に書かれた内径の範囲に入る」という意味です。メーカーがその組み合わせで動作を確かめたことを意味しません。他社製カテーテルとの併用を推奨しないと書いている添付文書もあります。",
+  "△（要確認）は、添付文書に内径の上限や基準が書かれていないものです。使えるかどうかはわかりません。",
+  "データには誤りや、添付文書の改訂が反映されていない部分がありえます。画面上部の「添付文書と照合」の日付（いちばん古い製品の日付）を確かめ、使用前には必ず最新の添付文書・メーカーの情報を確認してください。",
+  "使うかどうか、どう使うかは、使用する医師が自分の判断と責任で決めてください。作成者は、このツールを使ったことで生じた結果について責任を負いません。",
+  "このツールは個人が作成したもので、各メーカーとは関係ありません。製品名は各社の商標です。"];
 
-/* ---------- カテーテルから ---------- */
-const catSeries = [...new Set(DATA.catheters.map(c => c.series))];
-let stC = store("cc.cat") || {series: catSeries[0], id: DATA.catheters[0].cat_id};
+/* ---------- 表示の明るさ（自動→ライト→ダーク） ---------- */
+const THEMES = ["", "light", "dark"], THEME_LABEL = {"":"自動", light:"ライト", dark:"ダーク"};
+function applyTheme(){
+  if(st.theme) document.documentElement.dataset.theme = st.theme; else document.documentElement.removeAttribute("data-theme");
+  $("#theme").textContent = THEME_LABEL[st.theme];
+}
 
-function viewCatheter(){
-  const parent = stC.series === "__parent";
-  let h = `<section class="pick"><span class="label">マイクロカテーテル</span><div class="chips">`;
-  h += catSeries.map(s => `<button class="chip" data-cs="${esc(s)}" aria-pressed="${stC.series===s}">${esc(s)}</button>`).join("");
-  h += `<button class="chip" data-cs="__parent" aria-pressed="${parent}">親カテーテル</button></div>`;
-  if(parent){
-    h += `<span class="label">親カテーテルの内径</span><div class="chips">` +
-      PARENT_PRESETS.map(v => `<button class="chip num" data-pid="${v}" aria-pressed="${!stC.pidManual && Math.abs((stC.pid||0)-v)<EPS}">${v}″</button>`).join("") + `</div>`;
-    h += `<div class="manual"><input id="pid-in" inputmode="decimal" placeholder="0.040" value="${stC.pidManual ?? ""}" aria-label="親カテーテル内径を入力"><span class="hint">inch で直接入力</span></div>`;
-  }else if(stC.series === "__manual"){
-    h += ``;
-  }else{
-    h += `<span class="label">モデル</span><div class="chips">` + DATA.catheters.filter(c => c.series === stC.series)
-      .map(c => `<button class="chip" data-cid="${c.cat_id}" aria-pressed="${stC.id===c.cat_id}">${esc(c.model.replace(c.series,"").replace(/^Carry /,"").trim()||c.model)}<small class="num">${inch(c.id_distal_in)}</small></button>`).join("") + `</div>`;
+/* ---------- 操作 ---------- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button,[data-close]"); if(!t) return;
+  const d = t.dataset;
+  if(d.ack !== undefined){ st.ack = TERMS_VER; save(); if(d.close !== undefined) closeOverlay(); render(); return; }
+  if(d.close !== undefined){ closeOverlay(); return; }
+  if(d.terms !== undefined){ showOverlay({type:"terms"}); return; }
+  if(d.install !== undefined){ showOverlay({type:"install"}); return; }
+  if(d.installGo !== undefined){ const e = bip; bip = null; e?.prompt(); e?.userChoice.then(r => { if(r.outcome === "accepted"){ st.inst = 1; save(); } render(); if(ov?.type === "install") closeOverlay(); }); return; }
+  if(d.installLater !== undefined){ st.inst = 1; save(); render(); return; }
+  if(d.star){
+    toggleStock(d.star, d.sid); render();
+    if(ov?.type === "pair"){ const y = $("#sheet-body").scrollTop; drawOverlay(); $("#sheet-body").scrollTop = y; }
+    else{ const on = inStock(d.star, d.sid); t.setAttribute("aria-pressed", on); t.textContent = on ? "★" : "☆"; }
+    $("#live").textContent = inStock(d.star, d.sid) ? "マイ在庫に入れました" : "マイ在庫から外しました";
+    return;
   }
-  if(!parent) h += `<div class="manual"><input id="mid-in" inputmode="decimal" placeholder="例 0.021" value="${stC.midManual ?? ""}" aria-label="マイクロカテーテル内径を入力"><span class="hint">一覧にないマイクロカテーテルは先端内径を入力</span></div>`;
-  h += `</section>`;
-
-  let cat = null, id = null, kind = parent ? "parent" : "micro", title = "";
-  let bad = false;
-  if(parent){
-    if(stC.pidManual){ id = parseFloat(stC.pidManual); bad = !idOk(id); } else id = stC.pid;
-    title = id ? `親カテーテル　内径 ${inch(id)}` : "";
+  if(d.onlyStock){ st.onlyStock = d.onlyStock === "1"; render(); return; }
+  if(d.share !== undefined){ share(); return; }
+  if(t.id === "theme"){ st.theme = THEMES[(THEMES.indexOf(st.theme) + 1) % 3]; save(); applyTheme(); return; }
+  if(d.open){ const a = st.anchor; showOverlay({type:"pick", side:d.open, seg: d.open === "cat" && ((a?.side === "cat" && a.key.t === "parent") || (a?.side === "coil" && coilById(a.id)?.delivery_via === "parent")) ? "parent" : "micro", q:""}); return; }
+  if(d.clear){
+    /* 基準を外したときは、相手を新しい基準にする */
+    if(st.anchor?.side === d.clear){ const p = st.partner; setAnchor(p ? (d.clear === "cat" ? {side:"coil", id:p} : {side:"cat", key:p}) : null); st.partner = null; save(); }
+    else setPartner(null);
+    render(); return;
   }
-  else if(stC.midManual){ id = parseFloat(stC.midManual); bad = !idOk(id); title = `マイクロカテーテル（入力）　先端内径 ${inch(id)}`; }
-  else { cat = DATA.catheters.find(c => c.cat_id === stC.id); if(cat){ id = cat.id_distal_in; title = cat.model; } }
-
-  if(bad){ $("#view").innerHTML = h + `<p class="empty err">${ID_ERR}</p>`; return bindCat(); }
-  if(!id || !(id > 0)){ $("#view").innerHTML = h + `<p class="empty">カテーテルを選ぶか内径を入力すると、使えるコイルを表示します</p>`; return bindCat(); }
-
-  h += `<div class="sel"><span class="name">${esc(title)}</span>`;
-  if(cat) h += `<div class="spec"><span>先端内径 <b class="num">${inch(cat.id_distal_in)}</b></span><span>手元内径 <b class="num">${inch(cat.id_proximal_in)}</b></span><span>外径 <b class="num">${cat.od_distal_fr ?? "—"}/${cat.od_proximal_fr ?? "—"}Fr</b></span><span>有効長 <b class="num">${esc((cat.lengths_cm||"—").replaceAll(";"," / "))}</b> cm</span>${cat.min_guide_id_in ? `<span>通せる親カテーテル 内径 <b class="num">${inch(cat.min_guide_id_in)}</b> 以上</span>` : ""}</div>${cat.note ? `<div class="spec"><span>${esc(cat.note)}</span></div>` : ""}${badges(cat)}`;
-  h += `</div>`;
-
-  const items = DATA.coils.map(o => ({o, r: judge(o, id, kind)}));
-  h += splitView(items, o => SURF[o.surface] || o.surface, ({o, r}) => {
-    const extra = (mfrListed(o, cat) ? `<span class="bd mfr">メーカー記載あり</span>` : "") +
-      (o.reposition_limit_min ? `<span class="bd time">${o.reposition_limit_min}分以内に離脱</span>` : "");
-    return `<details class="row"><summary><span class="mk ${r.s}">${SYM[r.s]}</span><span class="rb">
-        <span class="rn">${esc(o.group)}</span>
-        ${o.size_condition && o.size_condition !== "全サイズ" ? `<span class="rc">${esc(o.size_condition)}</span>` : ""}
-        ${r.why ? `<span class="why ${r.s}">${esc(r.why)}</span>` : ""}${badges(o, extra)}</span>
-        <span class="req">${reqText(o)}</span></summary>
-      <dl class="detail"><dt>適合内径</dt><dd class="num">${reqText(o)}</dd><dt>離脱</dt><dd>${esc(o.detach_device)||"—"}</dd>
-        ${o.mfr_listed_catheters ? `<dt>メーカー記載</dt><dd>${esc(o.mfr_listed_catheters)}</dd>` : ""}${srcRows(o)}</dl></details>`;
-  });
-  $("#view").innerHTML = h; bindCat();
-}
-function bindCat(){
-  document.querySelectorAll("[data-cs]").forEach(b => b.onclick = () => {
-    stC.series = b.dataset.cs; stC.midManual = "";
-    if(stC.series !== "__parent"){ const f = DATA.catheters.find(c => c.series === stC.series); if(f) stC.id = f.cat_id; }
-    save(); render(); });
-  document.querySelectorAll("[data-cid]").forEach(b => b.onclick = () => { stC.id = b.dataset.cid; stC.midManual = ""; save(); render(); });
-  document.querySelectorAll("[data-pid]").forEach(b => b.onclick = () => { stC.pid = +b.dataset.pid; stC.pidManual = ""; save(); render(); });
-  const p = $("#pid-in"); if(p) p.onchange = () => { stC.pidManual = p.value.trim(); stC.pid = null; save(); render(); };
-  const m = $("#mid-in"); if(m) m.onchange = () => { stC.midManual = m.value.trim(); save(); render(); };
-}
-
-/* ---------- コイルから ---------- */
-const SURF_ORDER = ["hydrogel", "fiber", "bare"];
-const coilSurfs = SURF_ORDER.filter(s => DATA.coils.some(c => c.surface === s))
-  .concat([...new Set(DATA.coils.map(c => c.surface))].filter(s => !SURF_ORDER.includes(s)));
-const seriesOf = s => [...new Set(DATA.coils.filter(c => c.surface === s).map(c => c.series))];
-let stK = store("cc.coil") || {};
-{ const c0 = DATA.coils.find(c => c.coil_id === stK.id) || DATA.coils[0];
-  stK = {surf: c0.surface, series: c0.series, id: c0.coil_id}; }
-
-/* タイプ・サイズのボタン名：シリーズ名を除き、全体がかっこで囲まれているときだけ外す（「CX（18型）」の閉じかっこは残す） */
-function chipLabel(c){
-  let s = c.group.replace(c.series, "").trim();
-  if(/^[（(].*[)）]$/.test(s)) s = s.slice(1, -1).trim();
-  return s || c.group;
-}
-function viewCoil(){
-  let h = `<section class="pick">` + coilSurfs.map(sf => `<span class="label">${esc(SURF[sf]||sf)}</span><div class="chips">` +
-    seriesOf(sf).map(s => `<button class="chip" data-ksf="${esc(sf)}" data-ks="${esc(s)}" aria-pressed="${stK.surf===sf && stK.series===s}">${esc(s)}</button>`).join("") + `</div>`).join("");
-  h += `<span class="label">タイプ・サイズ</span><div class="chips">` + DATA.coils.filter(c => c.series === stK.series && c.surface === stK.surf)
-    .map(c => `<button class="chip" data-kid="${c.coil_id}" aria-pressed="${stK.id===c.coil_id}">${esc(chipLabel(c))}${c.size_condition && c.size_condition!=="全サイズ" ? `<small>${esc(c.size_condition)}</small>` : ""}</button>`).join("") + `</div></section>`;
-  const o = DATA.coils.find(c => c.coil_id === stK.id);
-  if(!o){ $("#view").innerHTML = h; return bindCoil(); }
-  h += `<div class="sel"><span class="name">${esc(o.group)}</span><div class="spec">
-      <span>適合内径 <b class="num">${reqText(o)}</b></span><span>${o.delivery_via==="parent"?"親カテーテルで送る":"マイクロカテーテルで送る"}</span>
-      <span>${SURF[o.surface]||o.surface}</span>${o.reposition_limit_min?`<span>カテーテルに入れてから <b>${o.reposition_limit_min}分</b>以内に離脱</span>`:""}</div>
-      ${o.mfr_listed_catheters ? `<div class="spec"><span>メーカー記載のカテーテル：${esc(o.mfr_listed_catheters)}</span></div>` : ""}${badges(o)}</div>`;
-
-  const items = DATA.catheters.map(c => ({o:c, r: judge(o, c.id_distal_in, "micro")}))
-    .concat(PARENT_PRESETS.map(v => ({o:{cat_id:"p"+v, series:"親カテーテル（内径）", model:`内径 ${v}″`, id_distal_in:v, parent:true, verified:true}, r: judge(o, v, "parent")})));
-  h += splitView(items, c => c.series, ({o:c, r}) => {
-    const extra = c.parent ? "" : (mfrListed(o, c) ? `<span class="bd mfr">メーカー記載あり</span>` : "");
-    return `<details class="row"><summary><span class="mk ${r.s}">${SYM[r.s]}</span><span class="rb">
-        <span class="rn">${esc(c.model)}</span>${r.why ? `<span class="why ${r.s}">${esc(r.why)}</span>` : ""}${c.parent ? "" : badges(c, extra)}</span>
-        <span class="req">${inch(c.id_distal_in)}</span></summary>
-      ${c.parent ? "" : `<dl class="detail"><dt>先端/手元内径</dt><dd class="num">${inch(c.id_distal_in)} / ${inch(c.id_proximal_in)}</dd><dt>有効長</dt><dd class="num">${esc((c.lengths_cm||"—").replaceAll(";"," / "))} cm</dd>${c.min_guide_id_in ? `<dt>通せる親</dt><dd class="num">内径 ${inch(c.min_guide_id_in)} 以上</dd>` : ""}${srcRows(c)}</dl>`}</details>`;
-  });
-  $("#view").innerHTML = h; bindCoil();
-}
-function bindCoil(){
-  document.querySelectorAll("[data-ks]").forEach(b => b.onclick = () => { stK.surf = b.dataset.ksf; stK.series = b.dataset.ks; stK.id = DATA.coils.find(c => c.series === stK.series && c.surface === stK.surf).coil_id; save(); render(); });
-  document.querySelectorAll("[data-kid]").forEach(b => b.onclick = () => { stK.id = b.dataset.kid; save(); render(); });
-}
-
-/* ---------- 共通 ---------- */
-let mode = store("cc.mode") || "cat";
-function save(){ store("cc.mode", mode); store("cc.cat", stC); store("cc.coil", stK); }
-function render(){
-  $("#tab-cat").setAttribute("aria-selected", mode === "cat");
-  $("#tab-coil").setAttribute("aria-selected", mode === "coil");
-  mode === "cat" ? viewCatheter() : viewCoil();
-}
-$("#tab-cat").onclick = () => { mode = "cat"; save(); render(); };
-$("#tab-coil").onclick = () => { mode = "coil"; save(); render(); };
+  if(d.showPair !== undefined){ const {c, o} = current(); openPair(c, o); return; }
+  if(d.jump){ document.getElementById(d.jump)?.scrollIntoView({behavior:"smooth", block:"start"}); return; }
+  if(d.seg){ ov.seg = d.seg; drawOverlay(); return; }
+  if(d.parent){ pickCat({t:"parent", v:+d.parent}); return; }
+  if(d.mid){ $("#mid").value = d.mid; useManual(d.mid); return; }
+  if(d.pickCat){ pickCat(JSON.parse(d.pickCat)); return; }
+  if(d.pickCoil){ pickCoil(d.pickCoil); return; }
+  if(d.pairCoil){ setPartner(d.pairCoil); render(); openPair(resolveCat(st.anchor.key), coilById(d.pairCoil)); return; }
+  if(d.pairCat){ const k = JSON.parse(d.pairCat); setPartner(k); render(); openPair(resolveCat(k), coilById(st.anchor.id)); return; }
+});
+/* 2つの枠が見えなくなったら、ヘッダーに選んだものを出す */
+try{
+  new IntersectionObserver(([en]) => { const off = !en.isIntersecting && !!st.anchor; $("#mini").hidden = !off; $("#bar").classList.toggle("scrolled", off); }, {rootMargin:"-70px 0px 0px 0px"}).observe($("#pair"));
+}catch(e){}
 $("#built").textContent = DATA.built;
+$("#checked").textContent = $("#checked2").textContent = DATA.checked || "—";
+$("#install-foot").hidden = !canInstall();
+applyTheme();
 render();
+if(openShared){ const {c, o} = current(); openPair(c, o); }
 </script>

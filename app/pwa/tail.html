@@ -1,5 +1,26 @@
 <script>
+/* Service Worker の登録と更新の知らせ。新しい版を受け取ったら下に「新しいデータがあります」を出す */
 if ("serviceWorker" in navigator) {
-  addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  addEventListener("load", async () => {
+    try {
+      const had = !!navigator.serviceWorker.controller;  /* 初めて開いたときは知らせない */
+      const reg = await navigator.serviceWorker.register("sw.js");
+      const box = document.getElementById("upd");
+      const show = w => {
+        if (!w || !navigator.serviceWorker.controller) return;
+        box.hidden = false;
+        document.getElementById("upd-go").onclick = () => w.postMessage("skip");
+      };
+      show(reg.waiting);
+      reg.addEventListener("updatefound", () => {
+        const w = reg.installing;
+        if (w) w.addEventListener("statechange", () => { if (w.state === "installed") show(w); });
+      });
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => { if (had && !reloaded) { reloaded = true; location.reload(); } });
+      /* ホーム画面から開き直したとき（裏から戻ったとき）にも新しい版を探す */
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    } catch (e) {}
+  });
 }
 </script>
