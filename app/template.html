@@ -119,7 +119,7 @@ footer{margin-top:28px;font-size:11.5px;color:var(--muted);display:flex;flex-dir
   <div id="view"></div>
 
   <footer>
-    <span>○ 添付文書の範囲内　△ 上限の記載なし・基準なし（理由を表示）　× 範囲外</span>
+    <span>○ 添付文書の範囲内　△ 要確認（上限の記載なし・基準なしなど。理由を表示）　× 範囲外</span>
     <span>出典は各行をタップすると表示されます。内径の単位は inch（″）。</span>
     <section class="terms" id="terms">
       <h2>ご利用にあたって</h2>
@@ -127,7 +127,7 @@ footer{margin-top:28px;font-size:11.5px;color:var(--muted);display:flex;flex-dir
         <li>このツールは、国内の添付文書・メーカーのカタログなど公開されている資料から、カテーテルの内径とコイルが求める内径を照らし合わせて表示する参考情報です。医療機器どうしの適合や安全性を保証するものではありません。</li>
         <li>判定に使っているのは内径の数値だけです。カテーテルの柔らかさや屈曲、マーカーの数と位置、親カテーテルとの組み合わせ、離脱装置、ハイドロゲルコイルの留置までの時間などは考えていません。</li>
         <li>○は「添付文書に書かれた内径の範囲に入る」という意味です。メーカーがその組み合わせで動作を確かめたことを意味しません。他社製カテーテルとの併用を推奨しないと書いている添付文書もあります。</li>
-        <li>△は、添付文書に内径の上限や基準が書かれていないものです。使えるかどうかはわかりません。</li>
+        <li>△（要確認）は、添付文書に内径の上限や基準が書かれていないものです。使えるかどうかはわかりません。</li>
         <li>データには誤りや、添付文書の改訂が反映されていない部分がありえます。画面上部の「データ」の日付を確かめ、使用前には必ず最新の添付文書・メーカーの情報を確認してください。</li>
         <li>使うかどうか、どう使うかは、使用する医師が自分の判断と責任で決めてください。作成者は、このツールを使ったことで生じた結果について責任を負いません。</li>
         <li>このツールは個人が作成したもので、各メーカーとは関係ありません。製品名は各社の商標です。</li>
@@ -271,7 +271,7 @@ function viewCatheter(){
 
   const items = DATA.coils.map(o => ({o, r: judge(o, id, kind)}));
   h += splitView(items, o => SURF[o.surface] || o.surface, ({o, r}) => {
-    const extra = (mfrListed(o, cat) ? `<span class="bd mfr">メーカー確認済み</span>` : "") +
+    const extra = (mfrListed(o, cat) ? `<span class="bd mfr">メーカー記載あり</span>` : "") +
       (o.reposition_limit_min ? `<span class="bd time">${o.reposition_limit_min}分以内に離脱</span>` : "");
     return `<details class="row"><summary><span class="mk ${r.s}">${SYM[r.s]}</span><span class="rb">
         <span class="rn">${esc(o.group)}</span>
@@ -324,7 +324,7 @@ function viewCoil(){
   const items = DATA.catheters.map(c => ({o:c, r: judge(o, c.id_distal_in, "micro")}))
     .concat(PARENT_PRESETS.map(v => ({o:{cat_id:"p"+v, series:"親カテーテル（内径）", model:`内径 ${v}″`, id_distal_in:v, parent:true, verified:true}, r: judge(o, v, "parent")})));
   h += splitView(items, c => c.series, ({o:c, r}) => {
-    const extra = c.parent ? "" : (mfrListed(o, c) ? `<span class="bd mfr">メーカー確認済み</span>` : "");
+    const extra = c.parent ? "" : (mfrListed(o, c) ? `<span class="bd mfr">メーカー記載あり</span>` : "");
     return `<details class="row"><summary><span class="mk ${r.s}">${SYM[r.s]}</span><span class="rb">
         <span class="rn">${esc(c.model)}</span>${r.why ? `<span class="why ${r.s}">${esc(r.why)}</span>` : ""}${c.parent ? "" : badges(c, extra)}</span>
         <span class="req">${inch(c.id_distal_in)}</span></summary>
