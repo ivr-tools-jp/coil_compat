@@ -14,6 +14,7 @@
   --ng:#6a767f; --ng-text:#545f68; --ng-soft:#e3e9ed;
   --flag:#a12f2f; --flag-on:#ffffff;
   --band:#698595; --mark:#0f1d25;
+  --sz-fg:#4f3189; --sz-line:#6c4ab3; --sz-bg:#f1edff;  /* サイズの札：青紫（「注意」の黄橙・放射能の赤紫と重ねない） */
   --scrim:rgba(8,20,28,.45); --shadow:0 1px 2px rgba(10,30,40,.06),0 8px 24px rgba(10,30,40,.07);
   --font-ui:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
   --font-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
@@ -28,6 +29,7 @@
   --ng:#76828b; --ng-text:#93a1a9; --ng-soft:#1f2529;
   --flag:#ed8b88; --flag-on:#131b1f;
   --band:#5b7686; --mark:#d0d9de;
+  --sz-fg:#d4c9fb; --sz-line:#9e88da; --sz-bg:#2d2642;
   --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
   color-scheme:dark}}
 :root[data-theme="dark"]{
@@ -39,6 +41,7 @@
   --ng:#76828b; --ng-text:#93a1a9; --ng-soft:#1f2529;
   --flag:#ed8b88; --flag-on:#131b1f;
   --band:#5b7686; --mark:#d0d9de;
+  --sz-fg:#d4c9fb; --sz-line:#9e88da; --sz-bg:#2d2642;
   --scrim:rgba(0,0,0,.6); --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.3);
   color-scheme:dark}
 
@@ -123,7 +126,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .chev{flex:none;align-self:center;color:var(--muted);font-size:22px;line-height:1}
 .row.sel{background:var(--accent-soft)}
 /* 同じ名前でサイズ違いのコイル（Concerto など）を取り違えないよう、サイズを名前の横の札にする */
-.sz{display:inline-block;margin-left:6px;font-size:13.5px;font-weight:700;line-height:1.4;padding:1px 8px;border-radius:6px;border:1.5px solid var(--fg);background:var(--surface);color:var(--fg);vertical-align:2px;white-space:nowrap;font-family:var(--font-ui)}
+.sz{display:inline-block;margin-left:6px;font-size:13.5px;font-weight:700;line-height:1.4;padding:1px 8px;border-radius:6px;border:1.5px solid var(--sz-line);background:var(--sz-bg);color:var(--sz-fg);vertical-align:2px;white-space:nowrap;font-family:var(--font-ui);font-weight:400}
+.sz b{font-weight:700}
 .slot .sz{margin:6px 0 0;align-self:flex-start;white-space:normal}
 /* 両方選んだときの「選んだ組み合わせ」 */
 .pairsum{width:100%;text-align:left;margin-top:14px;background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow)}
@@ -457,7 +461,8 @@ function sizeParts(o){
   const i = z.indexOf("（");  /* 長い説明（品番の一覧など）は札に入れず、下の行に出す */
   return i > 0 ? {chip:z.slice(0, i).trim(), rest:z.slice(i)} : {chip:z, rest:""};
 }
-const sizeChip = o => { const z = sizeParts(o); return z ? `<span class="sz">${esc(z.chip)}</span>` : ""; };
+/* 札の中は数字だけ太字（兄弟品どうしで違う部分に目が行くように） */
+const sizeChip = o => { const z = sizeParts(o); return z ? `<span class="sz">${esc(z.chip).replace(/[0-9][0-9.]*(?:〜[0-9.]+)?(?:mm|″)?(?:以上)?/g, m => `<b>${m}</b>`)}</span>` : ""; };
 function coilTags(o, cat){
   return (o.reposition_limit_min ? `<span class="tag time">${o.reposition_limit_min}分以内に離脱</span>` : "") +
     (mfrListed(o, cat) ? `<span class="tag mfr">メーカー記載あり</span>` : "") + (o.verified ? "" : `<span class="tag unv">未照合</span>`);
