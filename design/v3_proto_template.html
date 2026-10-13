@@ -121,6 +121,14 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tag.mfr{background:var(--accent-soft);color:var(--accent)}
 .tag.unv{background:var(--flag);color:var(--flag-on)}
 .chev{flex:none;align-self:center;color:var(--muted);font-size:22px;line-height:1}
+.row.sel{background:var(--accent-soft)}
+/* 両方選んだときの「選んだ組み合わせ」 */
+.pairsum{width:100%;text-align:left;margin-top:14px;background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow)}
+.ps-k{font-size:12.5px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.ps-row{display:flex;gap:12px;align-items:center}
+.ps-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ps-main b{font-size:18px}
+.ps-more{font-size:14px;font-weight:700;color:var(--accent)}
 /* × は隠さず、最後に小さく並べる */
 .ngsec{margin-top:26px}
 .list.compact .row{padding:10px 12px;gap:10px;min-height:var(--tap)}
@@ -344,13 +352,22 @@ function mk(s, px = 30, soft = false){
 const saved = store("cc3") || {};
 const st = {
   anchor: saved.anchor !== undefined ? saved.anchor : {side:"cat", key:{t:"micro", id:DATA.catheters[0].cat_id}},
+  partner: saved.partner || null,  /* 一覧の基準と反対側で選んだもの（基準がカテーテルならコイルのID、コイルならカテーテルのキー） */
   ack: saved.ack || "", t: saved.t || Date.now(), rec: saved.rec || {cat:[], coil:[]}, theme: saved.theme || ""
 };
 let staleMs = saved.anchor && Date.now() - (saved.t || 0) > STALE_MS ? Date.now() - saved.t : 0;
-const save = () => store("cc3", {anchor:st.anchor, ack:st.ack, t:st.t, rec:st.rec, theme:st.theme});
+if(staleMs) st.partner = null;  /* 時間がたっていたら、前回の組み合わせは出さない */
+const save = () => store("cc3", {anchor:st.anchor, partner:st.partner, ack:st.ack, t:st.t, rec:st.rec, theme:st.theme});
 const coilById = id => DATA.coils.find(c => c.coil_id === id);
 const catById = id => DATA.catheters.find(c => c.cat_id === id);
-function setAnchor(a){ st.anchor = a; st.t = Date.now(); staleMs = 0; save(); }
+function setAnchor(a){ st.anchor = a; if(!a) st.partner = null; st.t = Date.now(); staleMs = 0; save(); }
+function setPartner(p){ st.partner = p; st.t = Date.now(); staleMs = 0; save(); }
+function current(){
+  const a = st.anchor; let c = null, o = null;
+  if(a?.side === "cat"){ c = resolveCat(a.key); o = st.partner ? coilById(st.partner) : null; }
+  else if(a?.side === "coil"){ o = coilById(a.id); c = st.partner ? resolveCat(st.partner) : null; }
+  return {c, o};
+}
 
 function resolveCat(k){
   if(!k) return null;
@@ -390,14 +407,22 @@ function slot(side, label, filled, v, n, extra){
   return `<div class="slot${filled ? " on" : ""}">
     <button class="slot-main" data-open="${side}" aria-label="${esc(label)}：${esc(filled ? v + "。変える" : v)}">
       <span class="slot-k">${label}</span><span class="slot-v">${esc(v)}</span>${n ? `<span class="slot-n num">${n}</span>` : ""}${extra || ""}
-    </button>${filled ? `<button class="slot-clear" data-clear aria-label="${label}を外す"><span>外す</span></button>` : ""}</div>`;
+    </button>${filled ? `<button class="slot-clear" data-clear="${side}" aria-label="${label}を外す"><span>外す</span></button>` : ""}</div>`;
 }
 function renderPair(c, o){
   const stale = staleMs ? `<span class="stale">前回の選択（${agoText(staleMs)}）</span>` : "";
+  const side = st.anchor?.side;
   $("#pair").innerHTML =
-    slot("cat", "カテーテル", !!c, c ? c.name : (o ? "一覧から選ぶ・入力" : "タップしてえらぶ"), c ? `${inch(c.idv)}<small>${c.kind === "parent" ? "内径" : "先端"}</small>` : "", c ? stale : "") +
+    slot("cat", "カテーテル", !!c, c ? c.name : (o ? "一覧から選ぶ・入力" : "タップしてえらぶ"), c ? `${inch(c.idv)}<small>${c.kind === "parent" ? "内径" : "先端"}</small>` : "", side === "cat" ? stale : "") +
     `<span class="plus" aria-hidden="true">＋</span>` +
-    slot("coil", "コイル", !!o, o ? o.group : (c ? "一覧から選ぶ" : "タップしてえらぶ"), o ? reqText(o) : "", o ? stale : "");
+    slot("coil", "コイル", !!o, o ? o.group : (c ? "一覧から選ぶ" : "タップしてえらぶ"), o ? reqText(o) : "", side === "coil" ? stale : "");
+}
+function pairSum(c, o){
+  const r = judge(o, c.idv, c.kind);
+  const g = o.delivery_via === c.kind ? gauge(o, c.idv, c.kind, false).html : "";
+  return `<button class="pairsum" data-show-pair><span class="ps-k">選んだ組み合わせ</span>
+    <span class="ps-row">${mk(r.s, 40)}<span class="ps-main"><b>${WORD_LONG[r.s]}</b>${r.why ? `<span class="why ${r.s}">${esc(r.why)}</span>` : ""}</span><span class="chev" aria-hidden="true">›</span></span>
+    ${g}<span class="ps-more">くわしく見る（数値・注意点・出典）</span></button>`;
 }
 function intro(){
   return st.ack === TERMS_VER ? "" : `<aside class="intro"><b>はじめに</b>
@@ -418,27 +443,28 @@ function groups(items, key, order, rowFn){
 function ngBlock(dead, rowFn){
   return dead.length ? `<section class="ngsec" id="ng"><h3 class="gh">${mk("ng", 18)}範囲外<span class="gc">${dead.length}</span></h3><div class="list compact">${dead.map(rowFn).join("")}</div></section>` : "";
 }
-function row(attr, s, name, req, sub, g, why, tags){
-  return `<button class="row" ${attr}>${mk(s)}<span class="rmain">
+function row(attr, s, name, req, sub, g, why, tags, sel){
+  return `<button class="row${sel ? " sel" : ""}" ${attr}${sel ? ` aria-current="true"` : ""}>${mk(s)}<span class="rmain">
     <span class="rtop"><span class="rname">${esc(name)}</span><span class="rreq num">${req}</span></span>
-    ${sub ? `<span class="rsub">${esc(sub)}</span>` : ""}${g || ""}${why ? `<span class="why ${s}">${esc(why)}</span>` : ""}${tags ? `<span class="tags">${tags}</span>` : ""}</span>
+    ${sub ? `<span class="rsub">${esc(sub)}</span>` : ""}${g || ""}${why ? `<span class="why ${s}">${esc(why)}</span>` : ""}${tags || sel ? `<span class="tags">${tags || ""}${sel ? `<span class="tag mfr">選んでいるもの</span>` : ""}</span>` : ""}</span>
     <span class="chev" aria-hidden="true">›</span></button>`;
 }
 function coilTags(o, cat){
   return (o.reposition_limit_min ? `<span class="tag time">${o.reposition_limit_min}分以内に離脱</span>` : "") +
     (mfrListed(o, cat) ? `<span class="tag mfr">メーカー記載あり</span>` : "") + (o.verified ? "" : `<span class="tag unv">未照合</span>`);
 }
-function viewCoils(c){
+function viewCoils(c, sel){
   const items = DATA.coils.map(o => ({o, r:judge(o, c.idv, c.kind)}));
   const live = items.filter(x => x.r.s !== "ng"), dead = items.filter(x => x.r.s === "ng");
   const sz = o => o.size_condition && o.size_condition !== "全サイズ" ? o.size_condition : "";
   const attr = o => `data-pair-coil="${esc(o.coil_id)}"`;
-  return intro() + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(c.name)}に通せるコイル<small>${c.kind === "parent" ? "内径" : "先端内径"} <span class="num">${inch(c.idv)}</span> で判定</small></h2>` + tally(items) +
+  const isSel = o => sel && o.coil_id === sel.coil_id;
+  return intro() + (sel ? pairSum(c, sel) : "") + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(c.name)}に通せるコイル<small>${c.kind === "parent" ? "内径" : "先端内径"} <span class="num">${inch(c.idv)}</span> で判定</small></h2>` + tally(items) +
     (live.length ? groups(live, x => SURF[x.o.surface] || x.o.surface, SURF_ORDER.map(s => SURF[s]),
-      ({o, r}) => row(attr(o), r.s, o.group, reqText(o), sz(o), gauge(o, c.idv, c.kind, false).html, r.why, coilTags(o, c.obj))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
-    ngBlock(dead, ({o, r}) => row(attr(o), "ng", o.group, reqText(o), "", "", r.why, ""));
+      ({o, r}) => row(attr(o), r.s, o.group, reqText(o), sz(o), gauge(o, c.idv, c.kind, false).html, r.why, coilTags(o, c.obj), isSel(o))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
+    ngBlock(dead, ({o, r}) => row(attr(o), "ng", o.group, reqText(o), "", "", r.why, "", isSel(o)));
 }
-function viewCats(o){
+function viewCats(o, sel){
   const kind = o.delivery_via;
   const items = kind === "parent"
     ? PARENT_PRESETS.map(v => ({o:{key:{t:"parent", v}, model:`内径 ${inch(v)}`, series:"親カテーテル（内径）", idv:v, sub:mm(v)}, r:judge(o, v, "parent")}))
@@ -446,17 +472,17 @@ function viewCats(o){
   const live = items.filter(x => x.r.s !== "ng"), dead = items.filter(x => x.r.s === "ng");
   const attr = c => `data-pair-cat='${esc(JSON.stringify(c.key))}'`;
   const tags = c => c.obj && mfrListed(o, c.obj) ? `<span class="tag mfr">メーカー記載あり</span>` : "";
-  return intro() + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(o.group)}を通せる${kind === "parent" ? "親カテーテル" : "マイクロカテーテル"}<small>コイルが求める内径 <span class="num">${reqText(o)}</span>${kind === "parent" ? "（親カテーテルで送るコイル）" : ""}</small></h2>` + tally(items) +
-    (live.length ? groups(live, x => x.o.series, null, ({o:c, r}) => row(attr(c), r.s, c.model, inchA(c.idv), c.sub, gauge(o, c.idv, kind, false).html, r.why, tags(c))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
-    ngBlock(dead, ({o:c, r}) => row(attr(c), "ng", c.model, inchA(c.idv), "", "", r.why, ""));
+  const selKey = sel ? JSON.stringify(sel.key) : "", isSel = c => !!selKey && JSON.stringify(c.key) === selKey;
+  return intro() + (sel ? pairSum(sel, o) : "") + `<h2 class="ctx" id="ctx" tabindex="-1">${esc(o.group)}を通せる${kind === "parent" ? "親カテーテル" : "マイクロカテーテル"}<small>コイルが求める内径 <span class="num">${reqText(o)}</span>${kind === "parent" ? "（親カテーテルで送るコイル）" : ""}</small></h2>` + tally(items) +
+    (live.length ? groups(live, x => x.o.series, null, ({o:c, r}) => row(attr(c), r.s, c.model, inchA(c.idv), c.sub, gauge(o, c.idv, kind, false).html, r.why, tags(c), isSel(c))) : `<p class="empty">○・△ の組み合わせはありません</p>`) +
+    ngBlock(dead, ({o:c, r}) => row(attr(c), "ng", c.model, inchA(c.idv), "", "", r.why, "", isSel(c)));
 }
 function render(){
-  const a = st.anchor;
-  const c = a?.side === "cat" ? resolveCat(a.key) : null, o = a?.side === "coil" ? coilById(a.id) : null;
+  const a = st.anchor, {c, o} = current();
   renderPair(c, o);
-  $("#out").innerHTML = c ? viewCoils(c) : o ? viewCats(o)
+  $("#out").innerHTML = a?.side === "cat" && c ? viewCoils(c, o) : a?.side === "coil" && o ? viewCats(o, c)
     : intro() + `<div class="empty"><span>カテーテルかコイルのどちらかをえらぶと、組み合わせの一覧を出します</span><button class="btn primary" data-open="cat">カテーテルからえらぶ</button><button class="btn" data-open="coil">コイルからえらぶ</button></div>`;
-  $("#mini").innerHTML = c ? `<span>${esc(c.name)}</span><span class="num">${inch(c.idv)}</span>` : o ? `<span>${esc(o.group)}</span><span class="num">${reqText(o)}</span>` : "";
+  $("#mini").innerHTML = c && o ? `<span>${esc(c.name)} ＋ ${esc(o.group)}</span>` : c ? `<span>${esc(c.name)}</span><span class="num">${inch(c.idv)}</span>` : o ? `<span>${esc(o.group)}</span><span class="num">${reqText(o)}</span>` : "";
   $("#legend").innerHTML = ["ok", "warn", "ng"].map(s => `<span>${mk(s, 18)}${{ok:"添付文書の範囲内", warn:"要確認（上限の記載なしなど。理由を表示）", ng:"範囲外"}[s]}</span>`).join("");
 }
 
@@ -564,12 +590,12 @@ function useManual(s){
 }
 function pickCat(key){
   remember("cat", key);
-  if(st.anchor && st.anchor.side === "coil"){ const c = resolveCat(key), o = coilById(st.anchor.id); return openPair(c, o); }
+  if(st.anchor && st.anchor.side === "coil"){ setPartner(key); render(); return openPair(resolveCat(key), coilById(st.anchor.id)); }
   setAnchor({side:"cat", key}); closeOverlay(); render(); scrollTo({top:0}); $("#ctx")?.focus({preventScroll:true});
 }
 function pickCoil(id){
   remember("coil", id);
-  if(st.anchor && st.anchor.side === "cat") return openPair(resolveCat(st.anchor.key), coilById(id));
+  if(st.anchor && st.anchor.side === "cat"){ setPartner(id); render(); return openPair(resolveCat(st.anchor.key), coilById(id)); }
   setAnchor({side:"coil", id}); closeOverlay(); render(); scrollTo({top:0}); $("#ctx")?.focus({preventScroll:true});
 }
 function openPair(c, o){
@@ -628,15 +654,21 @@ document.addEventListener("click", e => {
   if(d.terms !== undefined){ showOverlay({type:"terms"}); return; }
   if(t.id === "theme"){ st.theme = THEMES[(THEMES.indexOf(st.theme) + 1) % 3]; save(); applyTheme(); return; }
   if(d.open){ const a = st.anchor; showOverlay({type:"pick", side:d.open, seg: d.open === "cat" && ((a?.side === "cat" && a.key.t === "parent") || (a?.side === "coil" && coilById(a.id)?.delivery_via === "parent")) ? "parent" : "micro", q:""}); return; }
-  if(d.clear !== undefined){ setAnchor(null); render(); return; }
+  if(d.clear){
+    /* 基準を外したときは、相手を新しい基準にする */
+    if(st.anchor?.side === d.clear){ const p = st.partner; setAnchor(p ? (d.clear === "cat" ? {side:"coil", id:p} : {side:"cat", key:p}) : null); st.partner = null; save(); }
+    else setPartner(null);
+    render(); return;
+  }
+  if(d.showPair !== undefined){ const {c, o} = current(); openPair(c, o); return; }
   if(d.jump){ document.getElementById(d.jump)?.scrollIntoView({behavior:"smooth", block:"start"}); return; }
   if(d.seg){ ov.seg = d.seg; drawOverlay(); return; }
   if(d.parent){ pickCat({t:"parent", v:+d.parent}); return; }
   if(d.mid){ $("#mid").value = d.mid; useManual(d.mid); return; }
   if(d.pickCat){ pickCat(JSON.parse(d.pickCat)); return; }
   if(d.pickCoil){ pickCoil(d.pickCoil); return; }
-  if(d.pairCoil){ openPair(resolveCat(st.anchor.key), coilById(d.pairCoil)); return; }
-  if(d.pairCat){ openPair(resolveCat(JSON.parse(d.pairCat)), coilById(st.anchor.id)); return; }
+  if(d.pairCoil){ setPartner(d.pairCoil); render(); openPair(resolveCat(st.anchor.key), coilById(d.pairCoil)); return; }
+  if(d.pairCat){ const k = JSON.parse(d.pairCat); setPartner(k); render(); openPair(resolveCat(k), coilById(st.anchor.id)); return; }
 });
 /* 2つの枠が見えなくなったら、ヘッダーに選んだものを出す */
 try{
