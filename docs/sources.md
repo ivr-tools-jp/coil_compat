@@ -20,6 +20,10 @@ URL は `https://www.pmda.go.jp/PmdaSearch/kikiDetail/ResultDataSetPDF/<ファ�
 | i-ED フレーム | i-EDコイル・フレーム | 30800BZX00173000 | 2026-07 第1版 | pmda_200095_30800BZX00173000_A_01_01 |
 | ED | ＥＤコイル | 21400BZZ00110000 | 2021-07 第13版 | pmda_200095_21400BZZ00110000_A_01_07 |
 | Avenir | Wallaby Avenir コイルシステム | 30200BZI00008000 | 2025-09 第5版 | pmda_530381_30200BZI00008000_A_02_06 |
+| Penumbra PC400（A） | Penumbra PC400 コイルシステム（A） | 22400BZX00294000 | 2018-11 第6版 | pmda_650099_22400BZX00294000_A_01_06（2026-10-20 取得） |
+| Penumbra PC400（B） | Penumbra PC400 コイルシステム（B） | 22400BZX00294000 | 2022-02 第2版 | pmda_650099_22400BZX00294000_D_01_04（同） |
+| Penumbra PC400（SMART） | Penumbra PC400 コイルシステム（SMART） | 22400BZX00294000 | 2022-02 第4版 | pmda_650099_22400BZX00294000_C_01_06（同） |
+| Penumbra PC400（POD） | Penumbra PC400 コイルシステム（POD） | 22400BZX00294000 | 2018-11 第3版 | pmda_650099_22400BZX00294000_B_01_05（同） |
 | Carnelian（共通） | TMPマイクロカテーテル | 21600BZZ00094000 | — | pmda_480367_21600BZZ00094000_J_01_07 |
 | Carry Leon UX19・High Flow・Selective・Slim Leon | キャリー | 21600BZZ00598000 | 2017-08 第11版 | pmda_780251_21600BZZ00598000_A_01_11 |
 | （削除済み）Carry Leon NSX / NSX HF ※NBCA 用のため収録しない | UTMマイクロカテーテル３ | 30400BZX00050000 | — | pmda_780251_30400BZX00050000_A_01_02 |
