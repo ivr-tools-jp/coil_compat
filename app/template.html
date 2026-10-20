@@ -806,8 +806,8 @@ function pairHtml(c, o){
     ${tags ? `<div class="tags">${tags}</div>` : ""}
     <p class="vnote">内径の数値だけを照らし合わせた結果です。組み合わせの安全や動作は保証しません。使う前に添付文書を確認してください。</p></article>`;
   const sw = (side, id, name) => `<button class="btn stk" data-star="${side}" data-sid="${esc(id)}" aria-pressed="${inStock(side, id)}">${inStock(side, id) ? "★" : "☆"} ${esc(name)}</button>`;
-  h += `<div class="vacts"><span class="k">マイ在庫（★）</span>${sw("coil", o.coil_id, o.group + (sizeParts(o) ? " " + sizeParts(o).chip : ""))}${c.obj ? sw("cat", c.obj.cat_id, c.obj.model) : ""}</div>`;
   if(SITE) h += `<div class="vacts"><button class="btn" data-share>この組み合わせを送る（リンク）</button><span class="share-msg" id="share-msg" aria-live="polite"></span></div>`;
+  h += `<div class="vacts"><span class="k">マイ在庫（★）</span>${sw("coil", o.coil_id, o.group + (sizeParts(o) ? " " + sizeParts(o).chip : ""))}${c.obj ? sw("cat", c.obj.cat_id, c.obj.model) : ""}</div>`;
   h += `<details class="spec"><summary><span class="k">コイル</span>${esc(o.group)}${sizeChip(o)}</summary><dl>
     <dt>適合内径</dt><dd class="num">${reqText(o)}</dd>${o.size_condition && o.size_condition !== "全サイズ" ? `<dt>対象</dt><dd>${esc(o.size_condition)}</dd>` : ""}
     <dt>表面</dt><dd>${esc(SURF[o.surface] || o.surface)}</dd><dt>離脱</dt><dd>${esc(o.detach_device) || "—"}</dd>
