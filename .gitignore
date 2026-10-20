@@ -7,3 +7,6 @@ _site/
 app/index.html
 # 試作の生成物（design/v*_inject.py で作る）
 design/v*_proto.html
+# 照合表の生成物（tools/verify/build_verify.py で作る）と AI 再確認の結果
+tools/verify/coil_verify.html
+tools/verify/ai_*.json
