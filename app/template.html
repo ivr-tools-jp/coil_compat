@@ -98,6 +98,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .intro b{font-size:16px}
 .intro p{margin:0;font-size:14px}
 .intro .fine{font-size:13px;color:var(--muted)}
+.sh-body > .fine{margin:12px 2px 0;font-size:14px;color:var(--muted)}
 .acts{display:flex;gap:8px;flex-wrap:wrap}
 .btn{min-height:var(--tap);border-radius:12px;padding:0 16px;border:1px solid var(--line-strong);background:var(--surface);font-weight:700;font-size:15px}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
@@ -183,7 +184,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 footer{margin-top:32px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:8px}
 footer .lg{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--fg)}
 footer .lg span{display:inline-flex;align-items:center;gap:5px}
-footer button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:13px;align-self:flex-start;min-height:32px}
+footer button{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:13px;align-self:flex-start;min-height:var(--tap)}
 
 /* シート（選ぶ・判定・ご利用にあたって） */
 .sheet{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:flex-end}
@@ -419,11 +420,11 @@ const st = {
   partner: null,  /* 一覧の基準と反対側で選んだもの（基準がカテーテルならコイルのID、コイルならカテーテルのキー） */
   ack: typeof saved.ack === "string" ? saved.ack : "", t: +saved.t || Date.now(),
   /* 前回えらんだもの（側ごとに1つ）。旧版の「最近えらんだもの」（rec、最大4件）からは先頭を引き継ぐ */
-  last: {cat: [saved.last?.cat, ...arr(saved.rec?.cat)].find(k => typeof k === "string" && parseOr(k, okCatKey)) || "",
+  last: {cat: [saved.last?.cat, ...arr(saved.rec?.cat)].find(k => typeof k === "string" && parseOr(k, x => okCatKey(x) && x.t !== "parent")) || "",
          coil: [saved.last?.coil, ...arr(saved.rec?.coil)].find(k => typeof k === "string" && parseOr(k, coilById)) || ""},
   prev: null,  /* 12時間たって外した組み合わせ（「もとに戻す」用）。保存しない */
   theme: ["light", "dark"].includes(saved.theme) ? saved.theme : "",
-  stock: {cat: arr(saved.stock?.cat).filter(catById), coil: arr(saved.stock?.coil).filter(coilById)},  /* ★マイ在庫 */
+  stock: {cat: [...new Set(arr(saved.stock?.cat).filter(catById))], coil: [...new Set(arr(saved.stock?.coil).filter(coilById))]},  /* ★マイ在庫 */
   inst: saved.inst ? 1 : 0,  /* ホーム画面への追加の案内を閉じたか */
   onlyStock: false           /* 一覧を★だけにする。保存しない（応援先で隠れたままにならないように） */
 };
@@ -431,10 +432,13 @@ if(st.anchor?.side === "cat" && typeof saved.partner === "string" && coilById(sa
 if(st.anchor?.side === "coil" && okCatKey(saved.partner)) st.partner = saved.partner;
 const save = () => store("cc3", {anchor:st.anchor, partner:st.partner, ack:st.ack, t:st.t, last:st.last, theme:st.theme, stock:st.stock, inst:st.inst});
 /* 規則は1つ：12時間使わないと選択は外れる（両方の枠を空にする）。★マイ在庫は残る。外した組み合わせは「もとに戻す」で戻せる */
-if(st.anchor && saved.anchor && Date.now() - st.t > STALE_MS){
+function expire(){
+  if(!st.anchor || Date.now() - st.t <= STALE_MS) return false;
   st.prev = {anchor:st.anchor, partner:st.partner, ago:Date.now() - st.t};
   st.anchor = null; st.partner = null; save();
+  return true;
 }
+expire();
 const inStock = (side, id) => st.stock[side].includes(id);
 function toggleStock(side, id){ const l = st.stock[side]; st.stock[side] = l.includes(id) ? l.filter(x => x !== id) : [...l, id]; if(!st.stock[side].length) st.onlyStock = false; save(); }
 
@@ -490,7 +494,8 @@ function resolveCat(k){
   if(k.t === "parent") return {key:k, kind:"parent", idv:k.v, name:"親カテーテル", sub:"内径で判定", obj:null};
   return null;
 }
-function remember(side, key){ st.last[side] = JSON.stringify(key); save(); }
+/* 親カテーテルは選ぶ画面の「前回」に出さないので覚えない（前回のマイクロカテーテルを消さないように） */
+function remember(side, key){ if(key?.t === "parent") return; st.last[side] = JSON.stringify(key); save(); }
 function agoText(ms){ const h = Math.round(ms / 3600e3); return h < 48 ? `${h}時間前` : `${Math.round(h / 24)}日前`; }
 
 /* ---------- 内径ゲージ ---------- */
@@ -580,7 +585,7 @@ function stockFilter(items, side, idOf){
   const seg = stockSeg(st.onlyStock, has.length, items.length, "data-only-stock");
   if(!st.onlyStock) return {items, all:items, bar:seg, on:false};
   const h = count(items.filter(x => !has.includes(x)));
-  return {items:has, all:items, on:true, bar:seg + `<p class="stockbar on"><span>マイ在庫だけ表示中。ほかに 範囲内 <b class="num">${h.ok}</b>・要確認 <b class="num">${h.warn}</b>・範囲外 <b class="num">${h.ng}</b> 件を隠しています</span><button class="btn primary" data-only-stock="0">全部表示</button></p>`};
+  return {items:has, all:items, on:true, bar:seg + `<p class="stockbar on"><span>マイ在庫だけ表示中。ほかに 範囲内 <b class="num">${h.ok}</b>・要確認 <b class="num">${h.warn}</b>・範囲外 <b class="num">${h.ng}</b> 件を隠しています（上の「全部」で表示）</span></p>`};
 }
 /* 「マイ在庫｜全部」の切り替え（一覧と選ぶ画面で同じ見た目）。attr の値 1＝マイ在庫、0＝全部 */
 const stockSeg = (on, n, all, attr) => `<div class="seg stockseg" role="group" aria-label="表示する範囲"><button ${attr}="1" aria-pressed="${on}">★ マイ在庫（<span class="num">${n}</span>）</button><button ${attr}="0" aria-pressed="${!on}">全部（<span class="num">${all}</span>）</button></div>`;
@@ -677,12 +682,23 @@ function showOverlay(o){
   drawOverlay();
   $("#sheet-title").focus({preventScroll:true});
 }
-function closeOverlay(){ if(!ov) return; if(pushed){ try{ history.back(); return; }catch(e){} } hideOverlay(); }
+/* 選ぶ画面から開いたマイ在庫の編集は、閉じる・戻る・完了のどれでも選ぶ画面に戻る（編集に入るとき履歴を1つ足してある） */
+let subPushed = false;
+function backToPick(){
+  const b = ov.back; subPushed = false;
+  if(st.stock[b.side].length) b.view = "stock";
+  ov = b; drawOverlay(); $("#sheet-body").scrollTop = 0; $("#sheet-title").focus({preventScroll:true});
+}
+function closeOverlay(){
+  if(!ov) return;
+  if(ov.type === "stock" && ov.back){ if(subPushed){ try{ history.back(); return; }catch(e){} } backToPick(); return; }
+  if(pushed){ try{ history.back(); return; }catch(e){} } hideOverlay();
+}
 function hideOverlay(){
-  ov = null; pushed = false; $("#sheet").hidden = true; document.documentElement.classList.remove("lock"); $(".app").inert = false; $("#panel").style.transform = "";
+  ov = null; pushed = false; subPushed = false; $("#sheet").hidden = true; document.documentElement.classList.remove("lock"); $(".app").inert = false; $("#panel").style.transform = "";
   if(opener && document.contains(opener)) opener.focus({preventScroll:true});
 }
-addEventListener("popstate", () => { if(ov) hideOverlay(); });
+addEventListener("popstate", () => { if(ov?.type === "stock" && ov.back) backToPick(); else if(ov) hideOverlay(); });
 addEventListener("hashchange", () => {
   if(!readLink()) return;
   if(ov) hideOverlay();
@@ -762,7 +778,8 @@ function drawList(){
     const btn = (k, idv, name, meta) => `<button class="pi${on(k) ? " on" : ""}${ao ? " wm" : ""}" data-pick-cat='${esc(JSON.stringify(k))}'>
       ${ao ? mk(judge(ao, idv, "micro").s, 26) : ""}<span class="pn">${esc(name)}</span><span class="pv num">${inchA(idv)}</span><span class="pm">${meta}</span></button>`;
     item = c => btn({t:"micro", id:c.cat_id}, c.id_distal_in, c.model, `${esc(c.manufacturer)} · ${c.od_distal_fr ?? "—"}Fr`);
-    const k = st.last.cat && JSON.parse(st.last.cat), r = k && k.t !== "parent" && !on(k) && resolveCat(k);
+    const k = st.last.cat && JSON.parse(st.last.cat), isPartner = st.anchor?.side === "coil" && JSON.stringify(st.partner) === JSON.stringify(k);
+    const r = k && k.t !== "parent" && !on(k) && !isPartner && resolveCat(k);
     if(r && !(view === "stock" && r.obj && inStock("cat", r.obj.cat_id))) lastItem = btn(k, r.idv, r.name, r.obj ? `${esc(r.obj.manufacturer)} · ${r.obj.od_distal_fr ?? "—"}Fr` : esc(r.sub));
     shown = view === "stock" ? DATA.catheters.filter(c => inStock("cat", c.cat_id)) : DATA.catheters.filter(c => !q || CAT_HAY[c.cat_id].includes(q));
     const m = new Map(); shown.forEach(c => { if(!m.has(c.series)) m.set(c.series, []); m.get(c.series).push(item(c)); });
@@ -772,7 +789,7 @@ function drawList(){
     item = c => `<button class="pi${on(c) ? " on" : ""}${ac ? " wm" : ""}" data-pick-coil="${esc(c.coil_id)}">
       ${ac ? mk(judge(c, ac.idv, ac.kind).s, 26) : ""}<span class="pn">${esc(c.group)}${sizeChip(c)}</span><span class="pv num">${reqText(c)}</span><span class="pm">${esc(c.manufacturer)}${sizeParts(c)?.rest ? " · " + esc(sizeParts(c).rest) : ""}</span></button>`;
     const lc = st.last.coil && coilById(JSON.parse(st.last.coil));
-    if(lc && !on(lc) && !(view === "stock" && inStock("coil", lc.coil_id))) lastItem = item(lc);
+    if(lc && !on(lc) && !(st.anchor?.side === "cat" && st.partner === lc.coil_id) && !(view === "stock" && inStock("coil", lc.coil_id))) lastItem = item(lc);
     shown = view === "stock" ? DATA.coils.filter(c => inStock("coil", c.coil_id)) : DATA.coils.filter(c => !q || COIL_HAY[c.coil_id].includes(q));
     SURF_ORDER.forEach(s => { const l = shown.filter(c => c.surface === s); if(l.length) gs.push([SURF[s], l.map(item)]); });
   }
@@ -902,12 +919,12 @@ document.addEventListener("click", e => {
     return;
   }
   if(d.stockSide){ ov.side = d.stockSide; drawOverlay(); return; }
-  if(d.stockEdit !== undefined){ const back = ov?.type === "pick" ? ov : null; showOverlay({type:"stock", side:d.stockEdit || "coil", back}); return; }
-  if(d.stockDone !== undefined){
-    const back = ov.back; if(!back){ closeOverlay(); return; }
-    if(st.stock[back.side].length) back.view = "stock";
-    ov = back; drawOverlay(); return;
+  if(d.stockEdit !== undefined){
+    const back = ov?.type === "pick" ? ov : null;
+    if(back){ try{ history.pushState({cc:2}, ""); subPushed = true; }catch(e){ subPushed = false; } }
+    showOverlay({type:"stock", side:d.stockEdit || "coil", back}); return;
   }
+  if(d.stockDone !== undefined){ closeOverlay(); return; }
   if(d.pview){ ov.view = d.pview === "1" ? "stock" : "all"; drawList(); $("#sheet-body").scrollTop = 0; return; }
   if(d.restore !== undefined){ const p = st.prev; st.anchor = p.anchor; st.partner = p.partner; st.t = Date.now(); st.prev = null; save(); render(); return; }
   if(d.noticeX !== undefined){ notice = ""; render(); return; }
@@ -931,6 +948,9 @@ document.addEventListener("click", e => {
   if(d.pairCoil){ setPartner(d.pairCoil); render(); openPair(resolveCat(st.anchor.key), coilById(d.pairCoil)); return; }
   if(d.pairCat){ const k = JSON.parse(d.pairCat); setPartner(k); render(); openPair(resolveCat(k), coilById(st.anchor.id)); return; }
 });
+/* スマホのアプリは裏から戻っても読み直さないことが多いので、戻ったときにも12時間の規則を当てる（シートを開いている間は外さない） */
+document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible" && !ov && expire()) render(); });
+addEventListener("pageshow", e => { if(e.persisted && !ov && expire()) render(); });
 /* 2つの枠が見えなくなったら、ヘッダーに選んだものを出す */
 try{
   new IntersectionObserver(([en]) => { const off = !en.isIntersecting && !!st.anchor; $("#mini").hidden = !off; $("#bar").classList.toggle("scrolled", off); }, {rootMargin:"-70px 0px 0px 0px"}).observe($("#pair"));
