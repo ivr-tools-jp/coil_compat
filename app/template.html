@@ -89,7 +89,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .slot-n small{font-size:12px;color:var(--muted);font-weight:500;margin-left:4px;font-family:var(--font-ui)}
 .slot-clear{position:absolute;top:0;right:0;min-width:var(--tap);height:var(--tap);border:0;background:none;padding:0 8px;display:grid;place-items:center}
 .slot-clear span{font-size:12.5px;font-weight:700;color:var(--fg);border:1px solid var(--line-strong);border-radius:999px;padding:3px 10px;background:var(--surface)}
-.stale{align-self:flex-start;font-size:12px;font-weight:700;background:var(--warn-soft);color:var(--warn-text);border-radius:6px;padding:2px 7px;margin-top:4px}
+.prev{margin:12px 0 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surface-2);border-radius:12px;padding:8px 10px;font-size:14px}
+.prev span{flex:1 1 14em}
 .plus{display:grid;place-items:center;color:var(--muted);font-weight:700;font-size:22px}
 
 /* はじめに */
@@ -258,18 +259,21 @@ footer button{border:0;background:none;padding:0;color:var(--accent);text-decora
 .spec dl{margin:0;padding:0 14px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
 .spec dt{color:var(--muted)} .spec dd{margin:0;min-width:0;overflow-wrap:anywhere}
 /* ★マイ在庫 */
-.pw{display:flex;border-top:1px solid var(--line)}
-.pw:first-child{border-top:0}
-.pw .pi{flex:1;min-width:0;border-top:0}
-/* ★の列がある分、内径は名前の下の行に（横に並べると名前とサイズの札が押しつぶされる） */
-.pw .pi{grid-template-columns:1fr}
-.pw .pi .pn,.pw .pi .pv,.pw .pi .pm{grid-column:1;grid-row:auto;text-align:left}
-.pw .pi.wm{grid-template-columns:auto 1fr}
-.pw .pi.wm .mk{grid-column:1;grid-row:1 / span 3}
-.pw .pi.wm .pn,.pw .pi.wm .pv,.pw .pi.wm .pm{grid-column:2}
-.star{flex:none;width:52px;border:0;border-left:1px solid var(--line);background:none;font-size:22px;color:var(--muted);font-family:var(--font-ui)}
-.star[aria-pressed="true"]{color:var(--accent)}
+.pedit{margin:6px 2px 0;text-align:right}
+.lnk{border:0;background:none;color:var(--accent);font-weight:700;text-decoration:underline;min-height:var(--tap);padding:0 6px}
+.pmore{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;font-size:14px;color:var(--muted)}
+/* マイ在庫の編集：行全体がチェックボックス */
+.ck{width:100%;border:0;border-top:1px solid var(--line);background:none;text-align:left;display:grid;grid-template-columns:auto 1fr;gap:2px 12px;align-items:center;padding:10px 14px;min-height:56px}
+.ck:first-child{border-top:0}
+.ck .box{grid-row:1 / span 2;width:26px;height:26px;border:2px solid var(--line-strong);border-radius:7px;display:grid;place-items:center}
+.ck[aria-checked="true"]{background:var(--accent-soft)}
+.ck[aria-checked="true"] .box{background:var(--accent);border-color:var(--accent)}
+.ck[aria-checked="true"] .box::after{content:"";width:12px;height:7px;border:solid var(--accent-fg);border-width:0 0 3px 3px;transform:translate(0,-2px) rotate(-45deg)}
+.ck .pn{font-weight:700;min-width:0;overflow-wrap:anywhere} .ck .pm{grid-column:2;font-size:13px;color:var(--muted)}
+.scount{margin:8px 2px;font-size:14px;color:var(--muted)} .scount b{color:var(--fg);font-size:16px}
+.sdone{width:100%;margin-top:16px}
 .tag.stk{background:var(--surface-2);color:var(--fg);border:1px solid var(--line-strong)}
+.stockseg{margin-top:10px}
 .stockbar{margin:10px 2px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
 .stockbar.on{background:var(--accent-soft);border-radius:12px;padding:8px 10px;font-weight:700}
 .stockbar.on span{flex:1 1 12em}
@@ -309,6 +313,8 @@ footer button{border:0;background:none;padding:0;color:var(--accent);text-decora
     <span class="lg" id="legend"></span>
     <span>ゲージの帯はコイルが求める内径、縦線はカテーテルの内径。破線は添付文書に上限が書かれていない部分です。単位は inch（″）。</span>
     <span>添付文書と照合した日 <span class="num" id="checked2"></span>（いちばん古い製品の日付）・データ作成 <span class="num" id="built"></span></span>
+    <span>12時間使わないと、えらんだカテーテル・コイルは外れます（画面の上の「もとに戻す」で戻せます）。★マイ在庫は残ります。</span>
+    <button data-stock-edit="coil">マイ在庫を編集</button>
     <button data-terms>ご利用にあたって</button>
     <button data-install id="install-foot" hidden>ホーム画面に追加する</button>
   </footer>
@@ -412,7 +418,10 @@ const st = {
   anchor: saved.anchor === undefined ? {side:"cat", key:{t:"micro", id:DATA.catheters[0].cat_id}} : okAnchor(saved.anchor),
   partner: null,  /* 一覧の基準と反対側で選んだもの（基準がカテーテルならコイルのID、コイルならカテーテルのキー） */
   ack: typeof saved.ack === "string" ? saved.ack : "", t: +saved.t || Date.now(),
-  rec: {cat: arr(saved.rec?.cat).filter(k => parseOr(k, okCatKey)), coil: arr(saved.rec?.coil).filter(k => parseOr(k, coilById))},
+  /* 前回えらんだもの（側ごとに1つ）。旧版の「最近えらんだもの」（rec、最大4件）からは先頭を引き継ぐ */
+  last: {cat: [saved.last?.cat, ...arr(saved.rec?.cat)].find(k => typeof k === "string" && parseOr(k, okCatKey)) || "",
+         coil: [saved.last?.coil, ...arr(saved.rec?.coil)].find(k => typeof k === "string" && parseOr(k, coilById)) || ""},
+  prev: null,  /* 12時間たって外した組み合わせ（「もとに戻す」用）。保存しない */
   theme: ["light", "dark"].includes(saved.theme) ? saved.theme : "",
   stock: {cat: arr(saved.stock?.cat).filter(catById), coil: arr(saved.stock?.coil).filter(coilById)},  /* ★マイ在庫 */
   inst: saved.inst ? 1 : 0,  /* ホーム画面への追加の案内を閉じたか */
@@ -420,9 +429,12 @@ const st = {
 };
 if(st.anchor?.side === "cat" && typeof saved.partner === "string" && coilById(saved.partner)) st.partner = saved.partner;
 if(st.anchor?.side === "coil" && okCatKey(saved.partner)) st.partner = saved.partner;
-let staleMs = saved.anchor && Date.now() - st.t > STALE_MS ? Date.now() - st.t : 0;
-if(staleMs) st.partner = null;  /* 時間がたっていたら、前回の組み合わせは出さない */
-const save = () => store("cc3", {anchor:st.anchor, partner:st.partner, ack:st.ack, t:st.t, rec:st.rec, theme:st.theme, stock:st.stock, inst:st.inst});
+const save = () => store("cc3", {anchor:st.anchor, partner:st.partner, ack:st.ack, t:st.t, last:st.last, theme:st.theme, stock:st.stock, inst:st.inst});
+/* 規則は1つ：12時間使わないと選択は外れる（両方の枠を空にする）。★マイ在庫は残る。外した組み合わせは「もとに戻す」で戻せる */
+if(st.anchor && saved.anchor && Date.now() - st.t > STALE_MS){
+  st.prev = {anchor:st.anchor, partner:st.partner, ago:Date.now() - st.t};
+  st.anchor = null; st.partner = null; save();
+}
 const inStock = (side, id) => st.stock[side].includes(id);
 function toggleStock(side, id){ const l = st.stock[side]; st.stock[side] = l.includes(id) ? l.filter(x => x !== id) : [...l, id]; if(!st.stock[side].length) st.onlyStock = false; save(); }
 
@@ -456,14 +468,14 @@ function readLink(){
   else if(c){ st.anchor = {side:"cat", key:c}; st.partner = o; }
   else if(o){ st.anchor = {side:"coil", id:o}; st.partner = null; }
   else return true;
-  st.t = Date.now(); staleMs = 0; save();
+  st.t = Date.now(); st.prev = null; save();
   return true;
 }
 const openShared = readLink() && !!st.anchor && !!st.partner;
 /* シートを開いたまま読み直した（更新を含む）ときに残る、シート用の履歴を消す */
 try{ if(history.state?.cc) history.replaceState(null, ""); }catch(e){}
-function setAnchor(a){ st.anchor = a; if(!a) st.partner = null; st.t = Date.now(); staleMs = 0; save(); }
-function setPartner(p){ st.partner = p; st.t = Date.now(); staleMs = 0; save(); }
+function setAnchor(a){ st.anchor = a; if(!a) st.partner = null; st.t = Date.now(); st.prev = null; save(); }
+function setPartner(p){ st.partner = p; st.t = Date.now(); st.prev = null; save(); }
 function current(){
   const a = st.anchor; let c = null, o = null;
   if(a?.side === "cat"){ c = resolveCat(a.key); o = st.partner ? coilById(st.partner) : null; }
@@ -478,10 +490,7 @@ function resolveCat(k){
   if(k.t === "parent") return {key:k, kind:"parent", idv:k.v, name:"親カテーテル", sub:"内径で判定", obj:null};
   return null;
 }
-function remember(side, key){
-  const k = JSON.stringify(key);
-  st.rec[side] = [k, ...st.rec[side].filter(x => x !== k)].slice(0, 4); save();
-}
+function remember(side, key){ st.last[side] = JSON.stringify(key); save(); }
 function agoText(ms){ const h = Math.round(ms / 3600e3); return h < 48 ? `${h}時間前` : `${Math.round(h / 24)}日前`; }
 
 /* ---------- 内径ゲージ ---------- */
@@ -514,12 +523,18 @@ function slot(side, label, filled, v, n, extra){
     </button>${filled ? `<button class="slot-clear" data-clear="${side}" aria-label="${label}を外す"><span>外す</span></button>` : ""}</div>`;
 }
 function renderPair(c, o){
-  const stale = staleMs ? `<span class="stale">前回の選択（${agoText(staleMs)}）</span>` : "";
-  const side = st.anchor?.side;
   $("#pair").innerHTML =
-    slot("cat", "カテーテル", !!c, c ? c.name : (o ? "一覧から選ぶ・入力" : "タップしてえらぶ"), c ? `${inch(c.idv)}<small>${c.kind === "parent" ? "内径" : "先端"}</small>` : "", side === "cat" ? stale : "") +
+    slot("cat", "カテーテル", !!c, c ? c.name : (o ? "一覧から選ぶ・入力" : "タップしてえらぶ"), c ? `${inch(c.idv)}<small>${c.kind === "parent" ? "内径" : "先端"}</small>` : "", "") +
     `<span class="plus" aria-hidden="true">＋</span>` +
-    slot("coil", "コイル", !!o, o ? o.group : (c ? "一覧から選ぶ" : "タップしてえらぶ"), o ? reqText(o) : "", (o ? sizeChip(o) : "") + (side === "coil" ? stale : ""));
+    slot("coil", "コイル", !!o, o ? o.group : (c ? "一覧から選ぶ" : "タップしてえらぶ"), o ? reqText(o) : "", o ? sizeChip(o) : "");
+}
+/* 12時間たって外した組み合わせを1行で出す */
+function prevLine(){
+  const p = st.prev; if(!p) return "";
+  const c = p.anchor.side === "cat" ? resolveCat(p.anchor.key) : p.partner ? resolveCat(p.partner) : null;
+  const o = p.anchor.side === "coil" ? coilById(p.anchor.id) : p.partner ? coilById(p.partner) : null;
+  const name = [c && c.name, o && o.group + (sizeParts(o) ? " " + sizeParts(o).chip : "")].filter(Boolean).join(" ＋ ");
+  return `<p class="prev"><span>前回：${esc(name)}（${agoText(p.ago)}）</span><button class="btn" data-restore>もとに戻す</button></p>`;
 }
 function pairSum(c, o){
   const r = judge(o, c.idv, c.kind);
@@ -562,10 +577,13 @@ function tally(items){
 function stockFilter(items, side, idOf){
   const has = items.filter(x => idOf(x) && inStock(side, idOf(x)));
   if(!st.stock[side].length || !items.some(x => idOf(x))) return {items, all:items, bar:"", on:false};
-  if(!st.onlyStock) return {items, all:items, bar:`<p class="stockbar"><button class="btn" data-only-stock="1" aria-pressed="false">★ マイ在庫だけ表示</button></p>`, on:false};
+  const seg = stockSeg(st.onlyStock, has.length, items.length, "data-only-stock");
+  if(!st.onlyStock) return {items, all:items, bar:seg, on:false};
   const h = count(items.filter(x => !has.includes(x)));
-  return {items:has, all:items, on:true, bar:`<p class="stockbar on"><span>★ マイ在庫だけ表示中。ほかに 範囲内 <b class="num">${h.ok}</b>・要確認 <b class="num">${h.warn}</b>・範囲外 <b class="num">${h.ng}</b> 件を隠しています</span><button class="btn primary" data-only-stock="0">全部表示</button></p>`};
+  return {items:has, all:items, on:true, bar:seg + `<p class="stockbar on"><span>マイ在庫だけ表示中。ほかに 範囲内 <b class="num">${h.ok}</b>・要確認 <b class="num">${h.warn}</b>・範囲外 <b class="num">${h.ng}</b> 件を隠しています</span><button class="btn primary" data-only-stock="0">全部表示</button></p>`};
 }
+/* 「マイ在庫｜全部」の切り替え（一覧と選ぶ画面で同じ見た目）。attr の値 1＝マイ在庫、0＝全部 */
+const stockSeg = (on, n, all, attr) => `<div class="seg stockseg" role="group" aria-label="表示する範囲"><button ${attr}="1" aria-pressed="${on}">★ マイ在庫（<span class="num">${n}</span>）</button><button ${attr}="0" aria-pressed="${!on}">全部（<span class="num">${all}</span>）</button></div>`;
 /* ○△が1つもないときの文。★で隠しているだけなら、そう書く */
 function emptyLive(f){
   const n = count(f.all);
@@ -641,7 +659,7 @@ function viewCats(o, sel){
 function render(){
   const a = st.anchor, {c, o} = current();
   renderPair(c, o);
-  $("#out").innerHTML = (notice ? `<p class="notice" role="status"><span>${esc(notice)}</span><button class="btn" data-notice-x>閉じる</button></p>` : "") + (a?.side === "cat" && c ? viewCoils(c, o) : a?.side === "coil" && o ? viewCats(o, c)
+  $("#out").innerHTML = (notice ? `<p class="notice" role="status"><span>${esc(notice)}</span><button class="btn" data-notice-x>閉じる</button></p>` : "") + prevLine() + (a?.side === "cat" && c ? viewCoils(c, o) : a?.side === "coil" && o ? viewCats(o, c)
     : intro() + `<div class="empty"><span>カテーテルかコイルのどちらかをえらぶと、組み合わせの一覧を出します</span><button class="btn primary" data-open="cat">カテーテルからえらぶ</button><button class="btn" data-open="coil">コイルからえらぶ</button></div>`);
   $("#mini").innerHTML = c && o ? `<span>${esc(c.name)} ＋ ${esc(o.group)}</span>` : c ? `<span>${esc(c.name)}</span><span class="num">${inch(c.idv)}</span>` : o ? `<span>${esc(o.group)}</span><span class="num">${reqText(o)}</span>` : "";
   $("#legend").innerHTML = ["ok", "warn", "ng"].map(s => `<span>${mk(s, 18)}${{ok:"添付文書の範囲内", warn:"要確認（上限の記載なしなど。理由を表示）", ng:"範囲外"}[s]}</span>`).join("");
@@ -689,6 +707,7 @@ function drawOverlay(){
     return;
   }
   if(ov.type === "pair"){ t.textContent = "組み合わせの判定"; b.innerHTML = pairHtml(ov.c, ov.o); b.scrollTop = 0; return; }
+  if(ov.type === "stock"){ t.textContent = "マイ在庫を編集"; b.innerHTML = stockEditHtml(); b.scrollTop = 0; return; }
   if(ov.type === "install"){
     t.textContent = "ホーム画面に追加";
     b.innerHTML = `<div class="terms"><p>ホーム画面に追加すると、アプリのように開けて、電波のない場所でも使えます（一度開いたあと）。データが新しくなったときは、画面の下に「新しいデータがあります」と出ます。</p>${installHow()}</div>`;
@@ -717,8 +736,6 @@ async function share(){
   try{ await navigator.clipboard.writeText(url); msg.textContent = "リンクをコピーしました"; return; }catch(e){}
   msg.innerHTML = `<input class="share-url" readonly value="${esc(url)}" aria-label="共有リンク" onfocus="this.select()">`;
 }
-/* ★ボタン（行の右端。行そのものを押すと選ぶ、★を押すとマイ在庫に出し入れ） */
-const starBtn = (side, id, name) => `<button class="star" data-star="${side}" data-sid="${esc(id)}" aria-pressed="${inStock(side, id)}" aria-label="マイ在庫：${esc(name)}">${inStock(side, id) ? "★" : "☆"}</button>`;
 function searchBox(ph){
   return `<label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="q" type="search" placeholder="${ph}" autocomplete="off" enterkeyhint="search" aria-label="検索"></label>`;
@@ -730,30 +747,56 @@ function manualBox(label, ph){
 function hay(parts, nums){ return norm(parts.join(" ")) + " " + nums.filter(v => v != null).map(v => v.toFixed(4).replace(/0$/, "")).join(" "); }
 const CAT_HAY = Object.fromEntries(DATA.catheters.map(c => [c.cat_id, hay([c.model, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name, (c.search_alias || "").replaceAll(";", " ")], [c.id_distal_in])]));
 const COIL_HAY = Object.fromEntries(DATA.coils.map(c => [c.coil_id, hay([c.group, c.series, c.manufacturer, c.distributor_jp, c.jp_trade_name, c.size_condition, SURF[c.surface], (c.search_alias || "").replaceAll(";", " ")], [c.id_min_in, c.id_max_in])]));
+/* 選ぶ画面の一覧。検索していないときは「マイ在庫｜全部」を切り替える（検索はいつも全品）。前回えらんだものは1つだけ上に出す */
 function drawList(){
-  const q = norm(ov.q || ""), el = $("#plist"), gs = [];
+  const q = norm(ov.q || ""), el = $("#plist"), gs = [], side = ov.side;
   /* 片方を選んであるときは、相手の候補それぞれに○△×を出す（選ぶ前に結果が見える） */
-  const other = st.anchor && st.anchor.side !== ov.side;
-  const ao = other && ov.side === "cat" ? coilById(st.anchor.id) : null;
-  const ac = other && ov.side === "coil" ? resolveCat(st.anchor.key) : null;
-  if(ov.side === "cat"){
-    const on = c => st.anchor?.side === "cat" && st.anchor.key.t === "micro" && st.anchor.key.id === c.cat_id;
-    const item = c => `<div class="pw"><button class="pi${on(c) ? " on" : ""}${ao ? " wm" : ""}" data-pick-cat='${esc(JSON.stringify({t:"micro", id:c.cat_id}))}'>
-      ${ao ? mk(judge(ao, c.id_distal_in, "micro").s, 26) : ""}<span class="pn">${esc(c.model)}</span><span class="pv num">${inchA(c.id_distal_in)}</span><span class="pm">${esc(c.manufacturer)} · ${c.od_distal_fr ?? "—"}Fr</span></button>${starBtn("cat", c.cat_id, c.model)}</div>`;
-    if(!q){ const sk = st.stock.cat.map(catById).filter(Boolean); if(sk.length) gs.push(["★ マイ在庫", sk.map(item)]); }
-    if(!q){ const rec = st.rec.cat.map(k => JSON.parse(k)).filter(k => k.t === "micro").map(k => catById(k.id)).filter(Boolean); if(rec.length) gs.push(["最近えらんだもの", rec.map(item)]); }
-    const m = new Map(); DATA.catheters.filter(c => !q || CAT_HAY[c.cat_id].includes(q)).forEach(c => { if(!m.has(c.series)) m.set(c.series, []); m.get(c.series).push(item(c)); });
+  const other = st.anchor && st.anchor.side !== side;
+  const ao = other && side === "cat" ? coilById(st.anchor.id) : null;
+  const ac = other && side === "coil" ? resolveCat(st.anchor.key) : null;
+  const total = side === "cat" ? DATA.catheters.length : DATA.coils.length, nStock = st.stock[side].length;
+  const view = !q && nStock && ov.view === "stock" ? "stock" : "all";
+  let item, lastItem = "", shown;
+  if(side === "cat"){
+    const on = k => st.anchor?.side === "cat" && JSON.stringify(st.anchor.key) === JSON.stringify(k);
+    const btn = (k, idv, name, meta) => `<button class="pi${on(k) ? " on" : ""}${ao ? " wm" : ""}" data-pick-cat='${esc(JSON.stringify(k))}'>
+      ${ao ? mk(judge(ao, idv, "micro").s, 26) : ""}<span class="pn">${esc(name)}</span><span class="pv num">${inchA(idv)}</span><span class="pm">${meta}</span></button>`;
+    item = c => btn({t:"micro", id:c.cat_id}, c.id_distal_in, c.model, `${esc(c.manufacturer)} · ${c.od_distal_fr ?? "—"}Fr`);
+    const k = st.last.cat && JSON.parse(st.last.cat), r = k && k.t !== "parent" && !on(k) && resolveCat(k);
+    if(r && !(view === "stock" && r.obj && inStock("cat", r.obj.cat_id))) lastItem = btn(k, r.idv, r.name, r.obj ? `${esc(r.obj.manufacturer)} · ${r.obj.od_distal_fr ?? "—"}Fr` : esc(r.sub));
+    shown = view === "stock" ? DATA.catheters.filter(c => inStock("cat", c.cat_id)) : DATA.catheters.filter(c => !q || CAT_HAY[c.cat_id].includes(q));
+    const m = new Map(); shown.forEach(c => { if(!m.has(c.series)) m.set(c.series, []); m.get(c.series).push(item(c)); });
     gs.push(...m.entries());
   }else{
-    const item = c => `<div class="pw"><button class="pi${st.anchor?.side === "coil" && st.anchor.id === c.coil_id ? " on" : ""}${ac ? " wm" : ""}" data-pick-coil="${esc(c.coil_id)}">
-      ${ac ? mk(judge(c, ac.idv, ac.kind).s, 26) : ""}<span class="pn">${esc(c.group)}${sizeChip(c)}</span><span class="pv num">${reqText(c)}</span><span class="pm">${esc(c.manufacturer)}${sizeParts(c)?.rest ? " · " + esc(sizeParts(c).rest) : ""}</span></button>${starBtn("coil", c.coil_id, c.group + (sizeParts(c) ? " " + sizeParts(c).chip : ""))}</div>`;
-    const hits = DATA.coils.filter(c => !q || COIL_HAY[c.coil_id].includes(q));
-    if(!q){ const sk = st.stock.coil.map(coilById).filter(Boolean); if(sk.length) gs.push(["★ マイ在庫", sk.map(item)]); }
-    if(!q){ const rec = st.rec.coil.map(k => coilById(JSON.parse(k))).filter(Boolean); if(rec.length) gs.push(["最近えらんだもの", rec.map(item)]); }
-    SURF_ORDER.forEach(s => { const l = hits.filter(c => c.surface === s); if(l.length) gs.push([SURF[s], l.map(item)]); });
+    const on = c => st.anchor?.side === "coil" && st.anchor.id === c.coil_id;
+    item = c => `<button class="pi${on(c) ? " on" : ""}${ac ? " wm" : ""}" data-pick-coil="${esc(c.coil_id)}">
+      ${ac ? mk(judge(c, ac.idv, ac.kind).s, 26) : ""}<span class="pn">${esc(c.group)}${sizeChip(c)}</span><span class="pv num">${reqText(c)}</span><span class="pm">${esc(c.manufacturer)}${sizeParts(c)?.rest ? " · " + esc(sizeParts(c).rest) : ""}</span></button>`;
+    const lc = st.last.coil && coilById(JSON.parse(st.last.coil));
+    if(lc && !on(lc) && !(view === "stock" && inStock("coil", lc.coil_id))) lastItem = item(lc);
+    shown = view === "stock" ? DATA.coils.filter(c => inStock("coil", c.coil_id)) : DATA.coils.filter(c => !q || COIL_HAY[c.coil_id].includes(q));
+    SURF_ORDER.forEach(s => { const l = shown.filter(c => c.surface === s); if(l.length) gs.push([SURF[s], l.map(item)]); });
   }
-  el.innerHTML = gs.length ? gs.map(([k, l]) => `<div class="pg"><h3>${esc(k)}</h3><div class="list">${l.join("")}</div></div>`).join("")
-    : `<p class="none">「${esc(ov.q)}」に当たるものがありません</p>`;
+  const top = q ? "" : nStock
+    ? stockSeg(view === "stock", nStock, total, "data-pview") + `<p class="pedit"><button class="lnk" data-stock-edit="${side}">マイ在庫を編集</button></p>`
+    : `<aside class="intro"><b>よく使う品だけを並べられます</b><p>施設で使う品をマイ在庫に入れておくと、選ぶ画面の最初にそれだけを出します。</p><div class="acts"><button class="btn" data-stock-edit="${side}">マイ在庫を設定</button></div></aside>`;
+  const rest = view === "stock" ? `<p class="pmore">ほかに <b class="num">${total - shown.length}</b> 件。<button class="btn" data-pview="0">全部を見る</button></p>` : "";
+  if(!q && lastItem) gs.unshift(["前回えらんだもの", [lastItem]]);
+  el.innerHTML = top + (gs.length ? gs.map(([k, l]) => `<div class="pg"><h3>${esc(k)}</h3><div class="list">${l.join("")}</div></div>`).join("")
+    : `<p class="none">「${esc(ov.q)}」に当たるものがありません</p>`) + rest;
+}
+/* マイ在庫の編集（チェックの一覧。押すたびに保存） */
+function stockEditHtml(){
+  const side = ov.side, all = side === "cat" ? DATA.catheters : DATA.coils;
+  const id = x => side === "cat" ? x.cat_id : x.coil_id;
+  const name = x => side === "cat" ? esc(x.model) : esc(x.group) + sizeChip(x);
+  const ck = x => `<button class="ck" role="checkbox" aria-checked="${inStock(side, id(x))}" data-stock-tog="${side}" data-sid="${esc(id(x))}"><span class="box" aria-hidden="true"></span><span class="pn">${name(x)}</span><span class="pm">${esc(x.manufacturer)}</span></button>`;
+  const m = new Map(); all.forEach(x => { const k = side === "cat" ? x.series : SURF[x.surface]; if(!m.has(k)) m.set(k, []); m.get(k).push(x); });
+  const order = side === "cat" ? [...m.keys()] : SURF_ORDER.map(s => SURF[s]).filter(k => m.has(k));
+  return `<div class="seg" role="group" aria-label="編集するもの"><button data-stock-side="cat" aria-pressed="${side === "cat"}">カテーテル</button><button data-stock-side="coil" aria-pressed="${side === "coil"}">コイル</button></div>
+    <p class="fine">施設で使う品にチェック。選ぶ画面の最初に並びます。チェックはすぐ保存されます。</p>
+    <p class="scount" id="scount" aria-live="polite">${side === "cat" ? "カテーテル" : "コイル"} <b class="num">${st.stock[side].length}</b>／<span class="num">${all.length}</span></p>
+    <div class="plist">${order.map(k => `<div class="pg"><h3>${esc(k)}</h3><div class="list">${m.get(k).map(ck).join("")}</div></div>`).join("")}</div>
+    <button class="btn primary sdone" data-stock-done>完了</button>`;
 }
 const parseIn = s => { const v = parseFloat(String(s).normalize("NFKC")); return isFinite(v) ? v : null; };
 const okId = v => v != null && v >= ID_MIN && v <= ID_MAX;
@@ -805,7 +848,7 @@ function pairHtml(c, o){
       <div><span class="k">コイルが求める内径</span><b class="num">${reqText(o)}</b><small>${o.delivery_via === "parent" ? "親カテーテルで送る" : "マイクロカテーテルで送る"}</small></div></div>
     ${tags ? `<div class="tags">${tags}</div>` : ""}
     <p class="vnote">内径の数値だけを照らし合わせた結果です。組み合わせの安全や動作は保証しません。使う前に添付文書を確認してください。</p></article>`;
-  const sw = (side, id, name) => `<button class="btn stk" data-star="${side}" data-sid="${esc(id)}" aria-pressed="${inStock(side, id)}">${inStock(side, id) ? "★" : "☆"} ${esc(name)}</button>`;
+  const sw = (side, id, name) => `<button class="btn stk" data-star="${side}" data-sid="${esc(id)}" aria-pressed="${inStock(side, id)}">${inStock(side, id) ? `★ ${esc(name)}：マイ在庫から外す` : `☆ ${esc(name)}をマイ在庫に入れる`}</button>`;
   if(SITE) h += `<div class="vacts"><button class="btn" data-share>この組み合わせを送る（リンク）</button><span class="share-msg" id="share-msg" aria-live="polite"></span></div>`;
   h += `<div class="vacts"><span class="k">マイ在庫（★）</span>${sw("coil", o.coil_id, o.group + (sizeParts(o) ? " " + sizeParts(o).chip : ""))}${c.obj ? sw("cat", c.obj.cat_id, c.obj.model) : ""}</div>`;
   h += `<details class="spec"><summary><span class="k">コイル</span>${esc(o.group)}${sizeChip(o)}</summary><dl>
@@ -848,15 +891,30 @@ document.addEventListener("click", e => {
     toggleStock(d.star, d.sid); render();
     const on = inStock(d.star, d.sid), sel = `#sheet-body [data-star="${d.star}"][data-sid="${CSS.escape(d.sid)}"]`;
     if(ov?.type === "pair"){ const y = $("#sheet-body").scrollTop; drawOverlay(); $("#sheet-body").scrollTop = y; $(sel)?.focus({preventScroll:true}); }
-    else document.querySelectorAll(sel).forEach(b => { b.setAttribute("aria-pressed", on); b.textContent = on ? "★" : "☆"; });
-    $("#live").textContent = inStock(d.star, d.sid) ? "マイ在庫に入れました" : "マイ在庫から外しました";
+    $("#live").textContent = on ? "マイ在庫に入れました" : "マイ在庫から外しました";
     return;
   }
+  /* マイ在庫の編集：その場でチェックだけ切り替える（一覧の位置を動かさない） */
+  if(d.stockTog){
+    toggleStock(d.stockTog, d.sid); render();
+    t.setAttribute("aria-checked", inStock(d.stockTog, d.sid));
+    $("#scount b").textContent = st.stock[d.stockTog].length;
+    return;
+  }
+  if(d.stockSide){ ov.side = d.stockSide; drawOverlay(); return; }
+  if(d.stockEdit !== undefined){ const back = ov?.type === "pick" ? ov : null; showOverlay({type:"stock", side:d.stockEdit || "coil", back}); return; }
+  if(d.stockDone !== undefined){
+    const back = ov.back; if(!back){ closeOverlay(); return; }
+    if(st.stock[back.side].length) back.view = "stock";
+    ov = back; drawOverlay(); return;
+  }
+  if(d.pview){ ov.view = d.pview === "1" ? "stock" : "all"; drawList(); $("#sheet-body").scrollTop = 0; return; }
+  if(d.restore !== undefined){ const p = st.prev; st.anchor = p.anchor; st.partner = p.partner; st.t = Date.now(); st.prev = null; save(); render(); return; }
   if(d.noticeX !== undefined){ notice = ""; render(); return; }
   if(d.onlyStock){ st.onlyStock = d.onlyStock === "1"; render(); return; }
   if(d.share !== undefined){ share(); return; }
   if(t.id === "theme"){ st.theme = THEMES[(THEMES.indexOf(st.theme) + 1) % 3]; save(); applyTheme(); return; }
-  if(d.open){ const a = st.anchor; showOverlay({type:"pick", side:d.open, seg: d.open === "cat" && ((a?.side === "cat" && a.key.t === "parent") || (a?.side === "coil" && coilById(a.id)?.delivery_via === "parent")) ? "parent" : "micro", q:""}); return; }
+  if(d.open){ const a = st.anchor; showOverlay({type:"pick", side:d.open, seg: d.open === "cat" && ((a?.side === "cat" && a.key.t === "parent") || (a?.side === "coil" && coilById(a.id)?.delivery_via === "parent")) ? "parent" : "micro", q:"", view: st.stock[d.open].length ? "stock" : "all"}); return; }
   if(d.clear){
     /* 基準を外したときは、相手を新しい基準にする */
     if(st.anchor?.side === d.clear){ const p = st.partner; setAnchor(p ? (d.clear === "cat" ? {side:"coil", id:p} : {side:"cat", key:p}) : null); st.partner = null; save(); }
